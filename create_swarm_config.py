@@ -16,7 +16,6 @@ parser = argparse.ArgumentParser(description=DESCRIPTION)
 parser.add_argument('intersection', type=str, help="Name of the intersection")
 parser.add_argument('max', type=int, help="Max number of cars to use in the input fields", default=MAX_COUNT)
 parser.add_argument('overwrite', type=bool, help="Overwrite any old config with this name", default=False)
-parser.add_argument()
 
 def getSwarmCache(intersection):
     """
@@ -88,14 +87,7 @@ if __name__ == "__main__":
                         }
                     ]
                 },
-
                 "inferenceType": "TemporalAnomaly",
-                "inferenceArgs": {
-                    "predictionSteps": [
-                        1
-                    ],
-                    "predictedField": "kw_energy_consumption"
-                },
                 "iterationCount": -1,
                 "swarmSize": "medium"
             }
