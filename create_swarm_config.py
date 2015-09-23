@@ -5,7 +5,7 @@ import pymongo
 import pluck
 from connection import mongo_uri
 import csv
-from index import SWARM_CONFIGS_DIR
+from index import SWARM_CONFIGS_DIR, MAX_COUNT
 import pprint
 __author__ = 'Jonathan Mackenzie'
 
@@ -14,7 +14,7 @@ DESCRIPTION = "Create a swarm config for a given intersection if it doesn't alre
 
 parser = argparse.ArgumentParser(description=DESCRIPTION)
 parser.add_argument('intersection', type=str, help="Name of the intersection")
-parser.add_argument('max', type=int, help="Max number of cars to use in the input fields", default=192)
+parser.add_argument('max', type=int, help="Max number of cars to use in the input fields", default=MAX_COUNT)
 parser.add_argument('overwrite', type=bool, help="Overwrite any old config with this name", default=False)
 parser.add_argument()
 
@@ -33,13 +33,11 @@ def getSwarmCache(intersection):
             db = client.mack0242
             collection = db['ACC_201306_20130819113933']
             readings = collection.find({'site_no': intersection}) # probably do some filtering here
-            fieldnames = ['datetime']
-            for i in readings[0]['readings']:
-                fieldnames.append(i['sensor'])
+            fieldnames = ['datetime'] + getSensors(intersection)
             writer = csv.DictWriter(csv_out, fieldnames=fieldnames)
             writer.writeheader()
             if readings.count() == 0:
-                raise Exception("No such intersection with site_no:",intersection)
+                raise Exception("No such intersection with site_no '%s' exists" % intersection)
             else:
                 for i in readings:
                     row = {'datetime': i['datetime']}
@@ -54,6 +52,8 @@ def getSensors(intersection):
         db = client.mack0242
         collection = db['ACC_201306_20130819113933']
         reading = collection.find_one({'site_no': intersection})
+        if reading is None:
+            raise Exception("No such intersection with site_no '%s' exists" % intersection)
         return pluck.pluck(reading['readings'], 'sensor')
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -67,12 +67,13 @@ if __name__ == "__main__":
                         "fieldType": "datetime"
                     }]
             includedFields.extend([{
-                                       'fieldName': i,
-                                       'fieldType': "int",
-                                       "maxValue": args.max,
-                                       "minValue": 0}
+                               'fieldName': i,
+                               'fieldType': "int",
+                               "maxValue": args.max,
+                               "minValue": 0}
                                    for i in getSensors(args.intersection)])
             swarmConfig = {
+
                 "includedFields": includedFields,
                 "streamDef": {
                     "info": "Traffic Volumes on a per sensor basis",
@@ -88,7 +89,7 @@ if __name__ == "__main__":
                     ]
                 },
 
-                "inferenceType": "TemporalMultiStep",
+                "inferenceType": "TemporalAnomaly",
                 "inferenceArgs": {
                     "predictionSteps": [
                         1

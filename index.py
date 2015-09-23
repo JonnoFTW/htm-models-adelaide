@@ -1,7 +1,4 @@
 #!/usr/bin/env python2.7
-MIN_COUNT = 0
-MAX_COUNT = 192 # a reasonable assumption based on TS3001
-
 import pymongo
 from connection import mongo_uri
 from pluck import pluck
@@ -23,6 +20,10 @@ determines its anomaly score based on historical traffic flow
 MODEL_PARAMS_DIR = "model_params"
 MODEL_CACHE_DIR = "model_store"
 SWARM_CONFIGS_DIR = "swarm_configs"
+MIN_COUNT = 0
+MAX_COUNT = 192 # a reasonable assumption based on TS3001
+
+
 
 def setupFolders():
     for i in [MODEL_CACHE_DIR, MODEL_PARAMS_DIR, SWARM_CONFIGS_DIR]:
@@ -93,11 +94,14 @@ def writeModelParams(params, intersection):
         outfile.write("MODEL_PARAMS = \\\n%s" % pprint.PrettyPrint(indent=2).pformat(params))
     return outPath
 
-def swarmParams(swarmConfig, intersection, maxWorkers=4):
+def swarmParams(swarmConfig, intersection):
     outputLabel = intersection
     permWorkDir = os.path.abspath('swarm')
     if not os.path.exists(permWorkDir):
         os.mkdir(permWorkDir)
+    import multiprocessing as mp
+    # use 3/4 of your CPUs
+    maxWorkers = 3 * mp.cpu_count()/2
     modelParams = permutations_runner.runWithConfig(
         swarmConfig,
         {"maxWorkers": maxWorkers, "overwrite": True},
