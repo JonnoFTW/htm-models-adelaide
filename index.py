@@ -122,10 +122,11 @@ def swarmParams(swarmConfig, intersection):
 
 def runIoThroughNupic(readings, model, intersection, plot):
     shifter = InferenceShifter()
+    pfield = model.getInferenceArgs()['predictedField']
     if plot:
-        output = nupic_anomaly_output.NuPICPlotOutput(intersection)
+        output = nupic_anomaly_output.NuPICPlotOutput(intersection, pfield)
     else:
-        output = nupic_anomaly_output.NuPICFileOutput(intersection)
+        output = nupic_anomaly_output.NuPICFileOutput(intersection, pfield)
     counter = 0
     num_readings = len(readings[0]['readings'])
     flows = np.empty(num_readings, dtype=np.uint16)
