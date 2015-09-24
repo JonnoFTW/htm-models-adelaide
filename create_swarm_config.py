@@ -7,15 +7,18 @@ from connection import mongo_uri
 import csv
 from index import SWARM_CONFIGS_DIR, MAX_COUNT
 import pprint
+import operator
+from collections import Counter
 __author__ = 'Jonathan Mackenzie'
 
 SWARM_DATA_CACHE = 'swarm_data_cache'
 DESCRIPTION = "Create a swarm config for a given intersection if it doesn't already exist"
 
 parser = argparse.ArgumentParser(description=DESCRIPTION)
+parser.add_argument('--max', dest='max', type=int, help="Max number of cars to use in the input fields",
+                    default=MAX_COUNT)
+parser.add_argument('--overwrite', help="Overwrite any old config with this name", action='store_true')
 parser.add_argument('intersection', type=str, help="Name of the intersection")
-parser.add_argument('max', type=int, help="Max number of cars to use in the input fields", default=MAX_COUNT)
-parser.add_argument('overwrite', type=bool, help="Overwrite any old config with this name", default=False)
 
 def getSwarmCache(intersection):
     """
@@ -31,7 +34,7 @@ def getSwarmCache(intersection):
         with open(cache_file, 'wb') as csv_out, pymongo.MongoClient(mongo_uri) as client:
             db = client.mack0242
             collection = db['ACC_201306_20130819113933']
-            readings = collection.find({'site_no': intersection}) # probably do some filtering here
+            readings = collection.find({'site_no': intersection})
             fieldnames = ['datetime'] + getSensors(intersection)
             writer = csv.DictWriter(csv_out, fieldnames=fieldnames)
             writer.writeheader()
@@ -41,8 +44,7 @@ def getSwarmCache(intersection):
                 for i in readings:
                     row = {'datetime': i['datetime']}
                     for j in i['readings']:
-                        if j['vehicle_count'] < 2040:
-                            row[j['sensor']] = j['vehicle_count']
+                        row[j['sensor']] = j['vehicle_count']
                     writer.writerow(row)
     return "file://"+cache_file
 
@@ -54,17 +56,41 @@ def getSensors(intersection):
         if reading is None:
             raise Exception("No such intersection with site_no '%s' exists" % intersection)
         return pluck.pluck(reading['readings'], 'sensor')
+
+
+def getPopularLane(fname):
+    counter = Counter()
+    with open(fname[7:], 'rb') as cache_file:
+        reader = csv.DictReader(cache_file)
+        for row in reader:
+            del row['datetime']
+            for k, v in row.iteritems():
+                counter[k] += int(v)
+    return counter.most_common(1)[0][0]
+
+
+
+
 if __name__ == "__main__":
     args = parser.parse_args()
-    out_name = os.join(os.getcwd(), SWARM_CONFIGS_DIR, args.intersection + '_swarm_config')
-    if os.path.exists(out_name) and args.overwrite:
+    confdir = os.path.join(os.getcwd(), SWARM_CONFIGS_DIR)
+    cachedir = os.path.join(os.getcwd(), SWARM_DATA_CACHE)
+    dirs = [confdir, cachedir]
+    for i in dirs:
+        if not os.path.isdir(i):
+            print "Making directory:", i
+            os.makedirs(i)
+            open(os.path.join(i, '__init__.py'), 'wa').close()
+    out_name = os.path.join(os.getcwd(), SWARM_CONFIGS_DIR, 'swarm_config_%s.py' % args.intersection)
+    if os.path.exists(out_name) and not args.overwrite:
         sys.exit("Swarm configuration already exists! Use `overwrite` flag to remake")
     else:
         with open(out_name, 'wb') as out_file:
-            includedFields = [ {
+            includedFields = [{
                         "fieldName": "timestamp",
                         "fieldType": "datetime"
                     }]
+            swarmCache = getSwarmCache(args.intersection)
             includedFields.extend([{
                                'fieldName': i,
                                'fieldType': "int",
@@ -80,7 +106,7 @@ if __name__ == "__main__":
                     "streams": [
                         {
                             "info": "Traffic Volumes for "+args.intersection,
-                            "source": getSwarmCache(args.intersection),
+                            "source": swarmCache,
                             "columns": [
                                 "*"
                             ]
@@ -88,8 +114,14 @@ if __name__ == "__main__":
                     ]
                 },
                 "inferenceType": "TemporalAnomaly",
+                "inferenceArgs": {
+                    "predictionSteps": [
+                        1
+                    ],
+                    "predictedField": getPopularLane(swarmCache)
+                },
                 "iterationCount": -1,
                 "swarmSize": "medium"
             }
-            out_file.write("SWARM DESCRIPTION = \n{}".format(
+            out_file.write("SWARM_DESCRIPTION = {}".format(
                 pprint.pformat(swarmConfig, indent=2)))

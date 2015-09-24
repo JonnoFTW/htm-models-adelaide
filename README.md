@@ -9,7 +9,7 @@ Introduction
 Adelaide uses SCATS for collecting traffic data (along with signal control) using induction loops beneath the road
 to record the number of vehicles that go though a particular lane at an intersection. This data is provided in 5
 minute intervals. Our goal is to use this flow data to determine the presence of an incident on a section of road
-within a reasonable amount of time. Incidents are not restricted to accidents, they can also include:
+within a reasonable amount of time. Incidents are not restricted to vehicle accidents, they may also include:
 
 * Breakdowns
 * Spilled loads
@@ -25,15 +25,23 @@ In the field of automated incident detection (AID), the problem of detecting inc
 is still an open problem. Current research is limited to supervised techniques that are typically run on
 data collected in small scale traffic simulations that allow the researcher to easily optimise for 1 or 2 
 intersections and ignore the actual issue of scalability and the real-world application of their results.
-Additionally, these simulations often provide a more fine grained levelof data (eg. data is provided in 1 second
-intervals) than that of the real world data which m. These simulations also allow for ease of training since the simulation 
-also provides the time, location and duration of any incident.
+Additionally, these simulations often provide a more fine grained level of data (eg. data is provided in 1 second
+intervals) than that of the real world data which typically has longer collection intervals. These simulations
+also allow for ease of training since the simulation also provides the time, location and duration of any incident,
+something that is not easily obtained (although I have such data for this project and will use it for validation).
+
+Detection
+---------
 
 The use of HTM for this project was inspired by a [tutorial provided here]
 (https://github.com/nupic-community/htmengine-traffic-tutorial). This project was limited to single input models 
 using [htmengine](https://github.com/numenta/numenta-apps/tree/master/htmengine), but I wanted to see how multi-input
 models would work for my dataset. So I based my code of that in the 
 [hot gym anomaly tutorial](https://github.com/numenta/nupic/tree/master/examples/opf/clients/hotgym/anomaly).
+
+This project uses a model per intersection, where each input is a sensor on the road. Each sensor looks at a particular
+lane and does not record turning movements, only vehicles passing a sensor beneath the road. Intersections have at most 
+24 sensors. The large number of model inputs should be offset by the use of 
 
 Usage
 -----
@@ -46,7 +54,7 @@ Usage
 TODO
 ----
 
-* Create a web service similar to the tutorial one to show a map of intersections and their anamaly states
+* Create a web service similar to the tutorial one to show a map of intersections and their anomaly states
 * Create a warning system that sends an alarm when anomalous traffic is observed that may indicate an incident
 * Possibly link neighbouring models together, so that upstream and downstream flows are taken into account, although
 the inputs of upstream/ downstream intersections can just be fed into the model.

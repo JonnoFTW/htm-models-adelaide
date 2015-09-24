@@ -24,16 +24,18 @@ MIN_COUNT = 0
 MAX_COUNT = 192 # a reasonable assumption based on TS3001
 
 
-
 def setupFolders():
     for i in [MODEL_CACHE_DIR, MODEL_PARAMS_DIR, SWARM_CONFIGS_DIR]:
         directory = os.path.join(os.getcwd(), i)
         if not os.path.isdir(directory):
             print "Creating directory:", directory
-        os.makedirs(directory)
+            os.makedirs(directory)
+            open(os.path.join(directory, '__init__.py'), 'wa').close()
+
 
 def getModelDir(intersection):
     return os.path.join(os.getcwd(), MODEL_CACHE_DIR, intersection)
+
 
 def createModel(modelParams, intersection):
     modelDir = getModelDir(intersection)
@@ -58,41 +60,45 @@ def getMax():
 
 
 def getSwarmConfig(intersection):
-    importName = "%s.%s_swarm_config" % (SWARM_CONFIGS_DIR, intersection)
+    importName = "%s.swarm_config_%s" % (SWARM_CONFIGS_DIR, intersection)
+    print "file exists?", os.path.exists(importName.replace('.','/'))
     print "Importing swarm config from %s" % importName
     try:
-      importedSwarmConfig = importlib.import_module(importName).MODEL_PARAMS
+        importedSwarmConfig = importlib.import_module(importName)
     except ImportError:
-        raise Exception("No swarm config exist for '{0}'. Please run create_swarm_config.py {0}".format(intersection))
+        sys.exit("No swarm config exist for '{0}'. Please run create_swarm_config.py {0}".format(intersection))
     return importedSwarmConfig.SWARM_DESCRIPTION
 
 
 def getModelParamsFromName(intersection, swarm):
-  """
-  Given a gym name, assumes a matching model params python module exists within
-  the model_params directory and attempts to import it.
-  :param gymName: Gym name, used to guess the model params module name.
-  :return: OPF Model params dictionary
-  """
-  importName = "model_params.%s_model_params" % (intersection)
-  print "Importing model params from %s" % importName
-  try:
-    importedModelParams = importlib.import_module(importName).MODEL_PARAMS
-  except ImportError:
-      if swarm:
-          print "No model params exist for %s... swarming now!" % intersection
-          return swarmParams(getSwarmConfig(intersection), intersection)
-      else:
-        raise Exception("No model params exist for '%s'. Run swarm first!"
-                    % intersection)
-  return importedModelParams
+    """
+    Given an intersection name, assumes a matching model params python module exists within
+    the model_params directory and attempts to import it.
+    :param intersection: intersection name, used to guess the model params module name.
+    :param: swarm: run a swarm if the model params don't exist
+    :return: OPF Model params dictionary
+    """
+    importName = "%s.model_params_%s" % (MODEL_PARAMS_DIR, intersection)
+    print "Importing model params from %s" % importName
+    try:
+        importedModelParams = importlib.import_module(importName).MODEL_PARAMS
+    except ImportError:
+        if swarm:
+            print "No model params exist for %s... swarming now!" % intersection
+            swarmParams(getSwarmConfig(intersection), intersection)
+            sys.exit("Swarming complete! Run again to run to run the model")
+        else:
+            raise sys.exit("No model params exist for '%s'. Run swarm first!" % intersection)
+    return importedModelParams
+
 
 def writeModelParams(params, intersection):
-    paramsName = intersection + "_model_params.py"
+    paramsName = "model_params_%s.py" % intersection
     outPath = os.path.join(os.getcwd(), MODEL_PARAMS_DIR, paramsName)
     with open(outPath, 'wb') as outfile:
         outfile.write("MODEL_PARAMS = \\\n%s" % pprint.PrettyPrint(indent=2).pformat(params))
     return outPath
+
 
 def swarmParams(swarmConfig, intersection):
     outputLabel = intersection
@@ -108,11 +114,10 @@ def swarmParams(swarmConfig, intersection):
         outputLabel=outputLabel,
         outDir=permWorkDir,
         permWorkDir=permWorkDir,
-        verbosity=0
+        verbosity=2
     )
     modelParamsFile = writeModelParams(modelParams, intersection)
     return modelParamsFile
-
 
 
 def runIoThroughNupic(readings, model, intersection, plot):
@@ -134,11 +139,10 @@ def runIoThroughNupic(readings, model, intersection, plot):
         }
         for p, j in enumerate(i['readings']):
             vc = j['vehicle_count']
-            if vc < 2040:
-                fields[j['sensor']] = vc
-                flows[p] = vc
-            else:
-                flows[p] = -1
+            if vc > 2040:
+                vc = None
+            fields[j['sensor']] = vc
+            flows[p] = vc
         result = model.run(fields)
         if plot:
           result = shifter.shift(result)
@@ -149,24 +153,27 @@ def runIoThroughNupic(readings, model, intersection, plot):
         flows = np.empty(num_readings, dtype=np.uint16)
     output.close()
 
-def runModel(intersection, plot, swarm):
-     with pymongo.MongoClient(mongo_uri) as client:
-            db = client.mack0242
-            collection = db['ACC_201306_20130819113933']
-            readings = collection.find({'intersection_number': intersection})
-            if readings.count() == 0:
-                raise Exception("No such intersection '%s' exists!" % intersection)
 
-            model = createModel(getModelParamsFromName(intersection, swarm))
-            try:
-                runIoThroughNupic(readings, model, intersection, plot)
-            except KeyboardInterrupt:
-                model.save(getModelDir(intersection))
+def runModel(intersection, plot, swarm):
+    modelParams = getModelParamsFromName(intersection, swarm)
+    with pymongo.MongoClient(mongo_uri) as client:
+        db = client.mack0242
+        collection = db['ACC_201306_20130819113933']
+        readings = collection.find({'intersection_number': intersection})
+        if readings.count() == 0:
+            sys.exit("No such intersection '%s' exists!" % intersection)
+        model = createModel(modelParams)
+        try:
+            runIoThroughNupic(readings, model, intersection, plot)
+        except KeyboardInterrupt:
+            model.save(getModelDir(intersection))
+
 
 parser = argparse.ArgumentParser(description=DESCRIPTION)
-parser.add_argument('plot', type=bool, help="Plot the anomaly scores", default=False)
+parser.add_argument('--plot', help="Plot the anomaly scores", action='store_true')
+parser.add_argument('--swarm', help="Create model params via swarming", action='store_true')
 parser.add_argument('intersection', type=str, help="Name of the intersection", default=3001)
-parser.add_argument('swarm', type=bool, help="Create model params via swarming", default=True)
+
 if __name__ == "__main__":
     args = parser.parse_args()
     setupFolders()
