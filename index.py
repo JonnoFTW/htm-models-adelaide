@@ -61,7 +61,6 @@ def getMax():
 
 def getSwarmConfig(intersection):
     importName = "%s.swarm_config_%s" % (SWARM_CONFIGS_DIR, intersection)
-    print "file exists?", os.path.exists(importName.replace('.','/'))
     print "Importing swarm config from %s" % importName
     try:
         importedSwarmConfig = importlib.import_module(importName)
@@ -108,6 +107,7 @@ def swarmParams(swarmConfig, intersection):
     import multiprocessing as mp
     # use 3/4 of your CPUs
     maxWorkers = 3 * mp.cpu_count()/2
+    print "Running swarm!"
     modelParams = permutations_runner.runWithConfig(
         swarmConfig,
         {"maxWorkers": maxWorkers, "overwrite": True},
@@ -130,6 +130,14 @@ def runIoThroughNupic(readings, model, intersection, plot):
     counter = 0
     num_readings = len(readings[0]['readings'])
     flows = np.empty(num_readings, dtype=np.uint16)
+    # should probably use a message queue here or something
+    # running a data through a model could take a while
+    # and will block, if we multithread or multiprocess it could
+    # be good. Have a pool of processes, each assigned to process
+    # data for a particular set of models
+
+
+    # also investigate re analysing data near the start
     for i in readings:
         counter += 1
         if counter % 100 == 0:
@@ -170,12 +178,12 @@ def runModel(intersection, plot, swarm):
             model.save(getModelDir(intersection))
 
 
-parser = argparse.ArgumentParser(description=DESCRIPTION)
-parser.add_argument('--plot', help="Plot the anomaly scores", action='store_true')
-parser.add_argument('--swarm', help="Create model params via swarming", action='store_true')
-parser.add_argument('intersection', type=str, help="Name of the intersection", default=3001)
-
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=DESCRIPTION)
+    parser.add_argument('--plot', help="Plot the anomaly scores", action='store_true')
+    parser.add_argument('--swarm', help="Create model params via swarming", action='store_true')
+    parser.add_argument('intersection', type=str, help="Name of the intersection", default=3001)
+
     args = parser.parse_args()
     setupFolders()
     runModel(args.intersection, args.plot, args.swarm)

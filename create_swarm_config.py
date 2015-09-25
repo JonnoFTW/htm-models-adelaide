@@ -35,14 +35,22 @@ def getSwarmCache(intersection):
             db = client.mack0242
             collection = db['ACC_201306_20130819113933']
             readings = collection.find({'site_no': intersection})
-            fieldnames = ['datetime'] + getSensors(intersection)
+            sensors = getSensors(intersection)
+            fieldnames = ['datetime'] + sensors
             writer = csv.DictWriter(csv_out, fieldnames=fieldnames)
             writer.writeheader()
+            headerRow2 = {f: 'int' for f in sensors}
+            headerRow2['datetime'] = 'datetime'
+
+            headerRow3 = {'datetime': 'T'}
+            writer.writerow(headerRow2)
+            writer.writerow(headerRow3)
             if readings.count() == 0:
                 raise Exception("No such intersection with site_no '%s' exists" % intersection)
             else:
                 for i in readings:
-                    row = {'datetime': i['datetime']}
+                    # nupic model data format expects this format
+                    row = {'datetime': i['datetime'].strftime('%Y-%m-%d %H:%M')}
                     for j in i['readings']:
                         row[j['sensor']] = j['vehicle_count']
                     writer.writerow(row)
@@ -62,6 +70,9 @@ def getPopularLane(fname):
     counter = Counter()
     with open(fname[7:], 'rb') as cache_file:
         reader = csv.DictReader(cache_file)
+        # skip the header rows
+        reader.next()
+        reader.next()
         for row in reader:
             del row['datetime']
             for k, v in row.iteritems():
