@@ -5,7 +5,7 @@ import pymongo
 import pluck
 from connection import mongo_uri
 import csv
-from index import SWARM_CONFIGS_DIR, MAX_COUNT
+from index import SWARM_CONFIGS_DIR, MAX_COUNT, getEngineDir
 import pprint
 import operator
 from collections import Counter
@@ -26,7 +26,7 @@ def getSwarmCache(intersection):
     :return: the csv file where cache data is stored for
     this intersection to be used in swarming
     """
-    cache_file = os.path.join(os.getcwd(), SWARM_DATA_CACHE, intersection+'.csv')
+    cache_file = os.path.join(getEngineDir(), SWARM_DATA_CACHE, intersection+'.csv')
     if os.path.exists(cache_file):
         print "Using existing data cache file:", cache_file
     else:
@@ -80,19 +80,17 @@ def getPopularLane(fname):
     return counter.most_common(1)[0][0]
 
 
-
-
 if __name__ == "__main__":
     args = parser.parse_args()
-    confdir = os.path.join(os.getcwd(), SWARM_CONFIGS_DIR)
-    cachedir = os.path.join(os.getcwd(), SWARM_DATA_CACHE)
+    confdir = os.path.join(getEngineDir(), SWARM_CONFIGS_DIR)
+    cachedir = os.path.join(getEngineDir(), SWARM_DATA_CACHE)
     dirs = [confdir, cachedir]
     for i in dirs:
         if not os.path.isdir(i):
             print "Making directory:", i
             os.makedirs(i)
             open(os.path.join(i, '__init__.py'), 'wa').close()
-    out_name = os.path.join(os.getcwd(), SWARM_CONFIGS_DIR, 'swarm_config_%s.py' % args.intersection)
+    out_name = os.path.join(getEngineDir(), SWARM_CONFIGS_DIR, 'swarm_config_%s.py' % args.intersection)
     if os.path.exists(out_name) and not args.overwrite:
         sys.exit("Swarm configuration already exists! Use `overwrite` flag to remake")
     else:

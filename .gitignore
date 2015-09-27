@@ -2,7 +2,7 @@
 *.iml
 
 ## Directory-based project format:
-.idea/
+../.idea/
 # if you remove the above rule, at least ignore the following:
 
 # User-specific stuff:
@@ -44,10 +44,4 @@ com_crashlytics_export_strings.xml
 crashlytics.properties
 crashlytics-build.properties
 
-connection.py
-model_params/*
-model_store/*
-swarm_configs/*
-swarm_data_cache/*
-swarm/*
-*.pyc
+connection.yaml

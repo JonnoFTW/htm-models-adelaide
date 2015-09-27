@@ -1,17 +1,31 @@
 #!/usr/bin/env python2.7
-import pymongo
-from connection import mongo_uri
-from pluck import pluck
-import sys, argparse
+import sys
+import argparse
 import importlib
-import os, pprint
-import numpy as np
+import os
+import pprint
 
-import nupic_anomaly_output
+import pymongo
+from pluck import pluck
+import numpy as np
 from nupic.frameworks.opf.modelfactory import ModelFactory
 from nupic.data.inference_shifter import InferenceShifter
-
 from nupic.swarming import permutations_runner
+
+import nupic_anomaly_output
+import yaml
+
+
+def getEngineDir():
+    return os.path.dirname(os.path.realpath(__file__))
+
+try:
+    path = os.path.join(os.path.dirname(getEngineDir()), 'connection.yaml')
+    with open(path, 'r') as f:
+        mongo_uri = yaml.load(f)['mongo_uri']
+except:
+    raise Exception('No connection.yaml with mongo_uri defined! please make one with a mongo_uri variable')
+
 
 DESCRIPTION = """
 Makes and runs a NuPIC model for an intersection in Adelaide and
@@ -26,7 +40,7 @@ MAX_COUNT = 192 # a reasonable assumption based on TS3001
 
 def setupFolders():
     for i in [MODEL_CACHE_DIR, MODEL_PARAMS_DIR, SWARM_CONFIGS_DIR]:
-        directory = os.path.join(os.getcwd(), i)
+        directory = os.path.join(getEngineDir(), i)
         if not os.path.isdir(directory):
             print "Creating directory:", directory
             os.makedirs(directory)
@@ -34,7 +48,7 @@ def setupFolders():
 
 
 def getModelDir(intersection):
-    return os.path.join(os.getcwd(), MODEL_CACHE_DIR, intersection)
+    return os.path.join(getEngineDir(), MODEL_CACHE_DIR, intersection)
 
 
 def createModel(modelParams, intersection):
@@ -93,7 +107,7 @@ def getModelParamsFromName(intersection, swarm):
 
 def writeModelParams(params, intersection):
     paramsName = "model_params_%s.py" % intersection
-    outPath = os.path.join(os.getcwd(), MODEL_PARAMS_DIR, paramsName)
+    outPath = os.path.join(getEngineDir(), MODEL_PARAMS_DIR, paramsName)
     with open(outPath, 'wb') as outfile:
         outfile.write("MODEL_PARAMS = \\\n%s" % pprint.PrettyPrint(indent=2).pformat(params))
     return outPath
@@ -120,12 +134,12 @@ def swarmParams(swarmConfig, intersection):
     return modelParamsFile
 
 
-def runIoThroughNupic(readings, model, intersection, plot):
+def runIoThroughNupic(readings, model, intersection, output, write_anomaly, collection):
     shifter = InferenceShifter()
     pfield = model.getInferenceArgs()['predictedField']
-    if plot:
+    if output == 'plot':
         output = nupic_anomaly_output.NuPICPlotOutput(intersection, pfield)
-    else:
+    elif output == 'csv':
         output = nupic_anomaly_output.NuPICFileOutput(intersection, pfield)
     counter = 0
     num_readings = len(readings[0]['readings'])
@@ -153,38 +167,47 @@ def runIoThroughNupic(readings, model, intersection, plot):
             fields[j['sensor']] = vc
             flows[p] = vc
         result = model.run(fields)
-        if plot:
+        if output == 'plot':
           result = shifter.shift(result)
 
         prediction = result.inferences["multiStepBestPredictions"][1]
         anomalyScore = result.inferences["anomalyScore"]
-        output.write(timestamp, flows, prediction, anomalyScore)
+        if write_anomaly:
+            collection.update_one({"_id": i["_id"]},
+                                  {"$set": {"anomaly_score": anomalyScore,
+                                            "prediction": {
+                                                'sensor': pfield,
+                                                'prediction': prediction
+                                            }}})
+        if output:
+            output.write(timestamp, flows, prediction, anomalyScore)
         flows = np.empty(num_readings, dtype=np.uint16)
     output.close()
 
 
-def runModel(intersection, plot, swarm):
+def runModel(intersection, output, swarm, write_anomaly):
     modelParams = getModelParamsFromName(intersection, swarm)
     with pymongo.MongoClient(mongo_uri) as client:
         db = client.mack0242
         collection = db['ACC_201306_20130819113933']
         readings = collection.find({'intersection_number': intersection})
         if readings.count() == 0:
-            sys.exit("No such intersection '%s' exists!" % intersection)
+            sys.exit("No such intersection '%s' exists or it has no readings saved!" % intersection)
         model = createModel(modelParams)
         try:
-            runIoThroughNupic(readings, model, intersection, plot)
+            runIoThroughNupic(readings, model, intersection, output, write_anomaly, collection)
         except KeyboardInterrupt:
             model.save(getModelDir(intersection))
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=DESCRIPTION)
-    parser.add_argument('--plot', help="Plot the anomaly scores", action='store_true')
+    parser.add_argument('--output', type='str', help="Output anomaly scores to :", choices=['csv', 'plot'])
     parser.add_argument('--swarm', help="Create model params via swarming", action='store_true')
+    parser.add_argument('--write-anomaly', help="Write the anomaly score back into the document", action='store_true')
     parser.add_argument('intersection', type=str, help="Name of the intersection", default=3001)
 
     args = parser.parse_args()
     setupFolders()
-    runModel(args.intersection, args.plot, args.swarm)
+    runModel(args.intersection, args.output, args.swarm, args.write_anomaly)
 

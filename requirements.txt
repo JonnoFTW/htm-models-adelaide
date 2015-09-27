@@ -1,0 +1,9 @@
+https://s3-us-west-2.amazonaws.com/artifacts.numenta.org/numenta/nupic.core/releases/nupic.bindings/nupic.bindings-0.2.1-cp27-none-linux_x86_64.whl
+nupic
+pluck
+pyramid
+pyramid_mako
+pymongo
+numpy
+pyyaml
+mako
