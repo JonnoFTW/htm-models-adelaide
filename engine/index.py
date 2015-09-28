@@ -202,7 +202,7 @@ def runModel(intersection, output, swarm, write_anomaly):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=DESCRIPTION)
-    parser.add_argument('--output', type='str', help="Output anomaly scores to :", choices=['csv', 'plot'])
+    parser.add_argument('--output', type=str, help="Output anomaly scores to :", choices=['csv', 'plot'])
     parser.add_argument('--swarm', help="Create model params via swarming", action='store_true')
     parser.add_argument('--write-anomaly', help="Write the anomaly score back into the document", action='store_true')
     parser.add_argument('intersection', type=str, help="Name of the intersection", default=3001)

@@ -2,11 +2,14 @@ from wsgiref.simple_server import make_server
 from pyramid.config import Configurator
 from pyramid.renderers import render_to_response
 from datetime import datetime, timedelta
-from mako.template import Template
 import pymongo
 import os
 import yaml
 import json
+
+from pyramid.events import subscriber
+from pyramid.events import BeforeRender
+
 
 
 def get_site_dir():
@@ -21,6 +24,9 @@ try:
 except:
     raise Exception('No connection.yaml with mongo_uri defined! please make one with a mongo_uri variable')
 
+@subscriber(BeforeRender)
+def add_global(event):
+    event['GMAPS_API_KEY'] = gmaps_key
 
 def _get_mongo_client():
     """
@@ -37,7 +43,7 @@ def _get_intersection(intersection):
     Get information for a single intersection
     :return: a dict with the info
     """
-    return {}
+  #  return _get_intersections()[0]
     with _get_mongo_client() as client:
         coll = client.mack0242['locations']
         return coll.find_one({'intersection_number': intersection})
@@ -48,11 +54,11 @@ def _get_intersections():
     Get the signalised intersections for Adelaide
     :return: a cursor of documents of signalised intersections
     """
-    return [{'lga':'ACC','scats_region':'ACC','intersection_no':'3001'}]
+  #  return [{'lga':'ACC','scats_region':'ACC','intersection_number':'3001','loc': {'lat':-34.9271532,'lng':138.6003676}}]
 
     with _get_mongo_client() as client:
         coll = client.mack0242['locations']
-        return coll.find({'intersection_number': {'$exists': True}})
+        return coll.find({'intersection_number': {'$exists': True}}, {'_id': False})
 
 
 def get_accident_near(time, intersection):
@@ -84,7 +90,7 @@ def get_accident_near(time, intersection):
         })
 
 
-def get_anomaly_scores(from_date=None, to_date=None, intersection='3001'):
+def get_anomaly_scores(from_date=None, to_date=None, intersection='3001', anomaly_threshold=None):
     """
 
     :param from_date: unix time to get readings from
@@ -97,11 +103,14 @@ def get_anomaly_scores(from_date=None, to_date=None, intersection='3001'):
         coll = client.mack0242['ACC_201306_20130819113933']
         query = {'site_no': intersection}
         if from_date is not None:
-              query['datetime']['$gte'] =  datetime.utcfromtimestamp(from_date)
+              query['datetime']['$gte'] = datetime.utcfromtimestamp(from_date)
         if to_date is not None:
             query['datetime']['$lte'] = datetime.utcfromtimestamp(to_date)
+        if anomaly_threshold is not None:
+            query['anomaly_score'] = {'$gte': float(anomaly_threshold)}
         return coll.find(query,
-                         ['datetime', 'site_no', 'prediction', 'anomaly_score'])
+                         ['datetime', 'site_no', 'prediction', 'readings', 'anomaly_score']).\
+                sort('datetime', pymongo.ASCENDING)
 
 
 def show_map(request):
@@ -110,14 +119,32 @@ def show_map(request):
     :param request:
     :return:
     """
+    intersections = _get_intersections()
     return render_to_response(
         'views/map.mak',
-        {'GMAPS_API_KEY': gmaps_key},
+        {'intersections': json.dumps(list(intersections))
+         },
         request=request
     )
 
+
+def get_readings_anomaly_json(request):
+    """
+
+    :param request:
+    :return:
+    """
+    args = request.matchdict.POST
+    return list(get_anomaly_scores(args['from'], args['to'], args['intersection']))
+
+
 def intersections_json():
+    """
+
+    :return:
+    """
     return list(_get_intersections())
+
 
 def list_intersections(request):
     """
@@ -127,7 +154,8 @@ def list_intersections(request):
     """
     return render_to_response(
         'views/list.mak',
-        {'intersections': _get_intersections()},
+        {'intersections': _get_intersections()
+         },
         request=request
     )
 
@@ -142,12 +170,21 @@ def show_intersection(request):
     args = request.matchdict
     # show specific intersection if it exists
     intersection = _get_intersection(args['site_no'])
-    anomaly_score = get_anomaly_scores(intersection=args['site_no'])
+    anomaly_score = list(get_anomaly_scores(intersection=args['site_no']))
+    predIdx = -1
+    if len(anomaly_score) > 0:
+        try:
+            predIdx = next(index for (index, d) in enumerate(anomaly_score[0]['readings'])
+                   if d["sensor"] == anomaly_score[0]['prediction']['sensor'])
+        except:
+            pass
     return render_to_response(
         'views/intersection.mak',
         {'intersection': intersection,
-         'scores': anomaly_score
-         'GMAPS_API_KEY': gmaps_key},
+         'scores': anomaly_score,
+         'predIdx': predIdx,
+         'date_format': '%Y-%m-%d %H:%M',
+         },
         request=request
     )
 
@@ -159,11 +196,14 @@ if __name__ == '__main__':
     config.add_view(show_map, route_name='map')
     config.add_route('intersection', '/intersection/{site_no}')
     config.add_route('intersection_json', '/intersections.json')
+    config.add_route('readings_anomaly_json', '/get_readings_anomaly.json')
+    config.add_view(get_readings_anomaly_json, route_name='readings_anomaly_json', renderer='json')
     config.add_view(intersections_json, route_name='intersection_json', renderer='json')
     config.add_view(show_intersection, route_name='intersection')
     config.add_route('intersections', '/intersections')
     config.add_view(list_intersections, route_name='intersections')
-    config.add_static_view(name='assets',path='assets')
+    config.add_static_view(name='assets', path='assets')
+    config.scan()
     app = config.make_wsgi_app()
     host, port = '127.0.0.1', 8080
     server = make_server(host, port, app)
