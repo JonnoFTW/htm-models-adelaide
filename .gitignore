@@ -45,3 +45,9 @@ crashlytics.properties
 crashlytics-build.properties
 
 connection.yaml
+*.pyc
+
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt

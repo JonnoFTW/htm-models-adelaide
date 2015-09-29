@@ -13,7 +13,7 @@
 <table class="table table-hover table-bordered table-striped sortable">
 <thead>
 <tr>
-% for i in ('ID', 'LGA', 'Description','SCATS Region', 'Map', 'Charts'):
+% for i in ('ID', 'LGA', 'Description','SCATS Region', 'Map', 'Charts', 'Reports'):
     <th data-field="${i.lower().replace(' ','_')}">${i}</th>
 % endfor
 </tr>
@@ -32,6 +32,18 @@
     <span class="glyphicon glyphicon-map-marker"></span></button></a></td>
     <td><a href="/intersection/${i['intersection_number']}"> <button type="button" class="btn btn-primary btn-lg">
     <span class="glyphicon glyphicon-signal"></span></button></a></td>
+    <td> <li role="presentation" class="dropdown">
+        <a class="dropdown-toggle" data-toggle="dropdown" href="#" role="button" aria-haspopup="true" aria-expanded="false">
+          Reports<span class="caret"></span>
+        </a>
+        <ul class="dropdown-menu">
+          % for j in reports:
+            <li><a href="/reports/${i['intersection_number']/${j.lower().replace(' ','_')}}">${j}</a></li>
+          % endfor
+        </ul>
+      </li>
+      </td>
+
     </tr>
 % endfor
 </tbody>
@@ -41,7 +53,7 @@
 </div>
 <script type="text/javascript">
 $(document).ready(function () {
-    $('th').slice(-2).attr('data-defaultsort','disabled');
+    $('th').slice(-3).attr('data-defaultsort','disabled');
     (function ($) {
 
         $('#filter').keyup(function () {

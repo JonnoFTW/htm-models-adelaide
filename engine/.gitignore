@@ -3,3 +3,4 @@ model_store/*
 swarm_configs/*
 swarm_data_cache/*
 swarm/*
+*pyc

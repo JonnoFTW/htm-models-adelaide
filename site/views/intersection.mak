@@ -53,19 +53,7 @@
                     </div>
                     <!-- /.panel-body -->
                 </div>
-                 <div class="panel panel-default">
-                    <div class="panel-heading">
-                        <i class="fa fa-clock-o fa-fw"></i> Time Range
-                    </div>
-                    <div class="panel-body">
-                        <div class="input-group">
-                        <span class="input-group-addon"><i class="fa fa-clock-o fa-fw"></i></span>
-                         <input id="dateinput" name="daterange" class="form-control"/>
-                        </div>
-
-                        <i class="fa fa-spinner fa-pulse" style="display:none"id="loaderImage"></i>
-                    </div>
-                </div>
+                <% include file="time_range_panel.html"/>
             </div>
     </div>
     <div class="row">
@@ -177,7 +165,7 @@ $('input[name="daterange"]').daterangepicker({
         {
             'from': dates[0].trim(),
              'to': dates[1].trim(),
-             'intersection':${intersection['intersection_number']}
+             'intersection': '${intersection['intersection_number']}'
         },
         function(data) {
             var newData = []
