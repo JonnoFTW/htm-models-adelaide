@@ -32,17 +32,20 @@
     <span class="glyphicon glyphicon-map-marker"></span></button></a></td>
     <td><a href="/intersection/${i['intersection_number']}"> <button type="button" class="btn btn-primary btn-lg">
     <span class="glyphicon glyphicon-signal"></span></button></a></td>
-    <td> <li role="presentation" class="dropdown">
-        <a class="dropdown-toggle" data-toggle="dropdown" href="#" role="button" aria-haspopup="true" aria-expanded="false">
-          Reports<span class="caret"></span>
-        </a>
-        <ul class="dropdown-menu">
-          % for j in reports:
-            <li><a href="/reports/${i['intersection_number']/${j.lower().replace(' ','_')}}">${j}</a></li>
-          % endfor
-        </ul>
-      </li>
-      </td>
+    <td>
+        <ul class="nav nav-pills" role="tablist">
+            <li role="presentation" class="dropdown active">
+                <a class="dropdown-toggle" data-toggle="dropdown" href="#" role="button" aria-haspopup="true" aria-expanded="false">
+                  Reports<span class="caret"></span>
+                </a>
+                <ul class="dropdown-menu">
+                  % for j in reports:
+                    <li><a href="/reports/${i['intersection_number']}/${j.lower().replace(' ','_')}">${j}</a></li>
+                  % endfor
+                </ul>
+            </li>
+         </ul>
+    </td>
 
     </tr>
 % endfor

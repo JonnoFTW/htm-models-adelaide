@@ -1,13 +1,39 @@
 <%include file="header.html"/>
-<script type="text/javascript" src="//cdn.jsdelivr.net/bootstrap.daterangepicker/2/daterangepicker.js"></script>
 <div class="container">
-  <h1>${report} report for intersection: <a href="/intersection/${intersection}">${intersection}</a> in period:</h1>
+<%
+ report_title = report.replace('_',' ').title().replace('Am','AM').replace('Pm','PM')
+ data_exists = len(datas) > 0 and len(datas[0]['data']) > 0
+ if data_exists:
+    start_title = min(datas[0]['data'])[0].strftime('%d/%m/%Y')
+    end_title = max(datas[0]['data'])[0].strftime('%d/%m/%Y')
+ else:
+    start_title, end_title = start.strftime('%d/%m/%Y'),end.strftime('%d/%m/%Y')
+%>
+  <h1>  ${report_title}
+  report for intersection: <a href="/intersection/${intersection}">${intersection}</a> in period:
+  ${start_title} - ${end_title}</h1>
+
+<script type="text/javascript" src="//cdn.jsdelivr.net/bootstrap.daterangepicker/2/daterangepicker.js"></script>
+
+%if not data_exists:
+ <div class="row">
+        <div class="col-lg-6">
+            No data exists for the given time period
+             <%include file="time_range_panel.html"/>
+        </div>
+
+</div>
+% else:
+
    <div class="row">
         <div class="col-lg-6">
             <div class="panel panel-default">
                 <div class="panel-heading">
                     <i class="fa fa-line-chart fa-fw"></i> Info
                 </div>
+                % if stats == "Error":
+                    Error making statistics
+                % else:
                 <table class="table table-striped">
                     <thead>
                         <tr>
@@ -16,7 +42,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        % for k,v in stats:
+                        % for k,v in stats.items():
                         <tr>
                             <td>${k}</td>
                             <td>${v}</td>
@@ -24,10 +50,25 @@
                         % endfor
                     </tbody>
                 </table>
+                % endif
+                <div class="panel list-group">
+            <a href="#" class="list-group-item" data-toggle="collapse" data-target="#sm" data-parent="#menu">Reports</a>
+            <div id="sm" class="sublinks collapse">
+                % for i in reports:
+              <a href="/reports/${intersection}/${i.replace(' ','_').lower()}" class="list-group-item small">${i}</a>
+               %endfor
             </div>
+            </div>
+
         </div>
-       <% include file="time_range_panel.html"/>
+        </div>
+
+        <div class="col-lg-6">
+       <%include file="time_range_panel.html"/>
+       </div>
     </div>
+
+% for data in datas:
   <div class="row">
         <div class="col-lg-12">
             <div class="panel panel-default">
@@ -35,7 +76,7 @@
                     <i class="fa fa-line-chart fa-fw"></i> Chart
                 </div>
                 <div class="panel-body">
-                   <figure style="width: 100%; height: 300px;"  id="chart"></figure>
+                   <figure style="width: 100%; height: 300px;"  id="chart-${data['name']}"></figure>
                 </div>
             </div>
         </div>
@@ -44,7 +85,7 @@
         <div class="col-lg-12">
             <div class="panel panel-default">
                 <div class="panel-heading">
-                    <i class="fa fa-line-chart fa-fw"></i> Chart (Exportable?)
+                    <i class="fa fa-line-chart fa-fw"></i> Table
                 </div>
                 <table class="table table-striped">
                     <thead>
@@ -54,7 +95,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        % for k,v in data:
+                        % for k,v in data['data']:
                         <tr>
                             <td>${k}</td>
                             <td>${v}</td>
@@ -65,63 +106,65 @@
             </div>
         </div>
     </div>
-</div>
-<script type="text/javascript">
 
-var aData =[
-   % k,v in data:
-      [new Date('${k.strftime('${date_format[:-6]}')}'), ${v}],
+<script type="text/javascript">
+var data${data['name']} =[
+   % for k,v in data['data']:
+      [new Date(Date.UTC(${"{},{},{}".format(k.year, k.month-1, k.day)})), ${v}],
    % endfor
 ];
-if (aData.length ==0) {
+if (data${data['name']}.length ==0) {
     $('#chart').before('<div class="bs-callout bs-callout-danger">\
   <h4>Nothing to Display!</h4>\
   There\'s no values for this time period. There\'s probably no data yet.\
 </div>').height('0');
 } else {
-    var chart = new Dygraph(document.getElementById('chart'), aData, {
+    var chart = new Dygraph(document.getElementById('chart-${data['name']}'), data${data['name']}, {
       legend: 'always',
-      title: 'Traffic Volume Report',
+      %if 'chart-title' in data:
+      title: '${data['chart-title']} for ${start_title} - ${end_title}',
+      %else:
+      title: '${report_title} for ${start_title} - ${end_title}',
+      %endif
+
       ylabel: 'Volume',
       xlabel: 'Date',
+      labelsUTC: true,
+        drawPoints: true,
+     /* axes: { x: {
+          valueFormatter: valueFormatter,
+          axisLabelFormatter: dateAxisFormatter,
+          ticker: customDateTickerTZ
+         }
+      },*/
       volume: {
             color: "red",
+            % if 'highest' in report:
+             strokeWidth: 0.0
+             % else:
             strokeWidth: 2.0,
+            % endif
         },
-      labels: ['date', 'volume']
+      labels: ['Date', 'volume'],
+      <%include file="dygraph_weekend.js"/>
+
     });
 }
-
-
+</script>
+%endfor
+%endif
+</div>
+<script type="text/javascript">
 $('input[name="daterange"]').daterangepicker({
-    timePicker: true,
-    timePickerIncrement: 5,
     locale: {
-        format: 'DD/MM/YYYY H:mm'
+        format: 'DD.MM.YYYY'
     }
 }).on('apply.daterangepicker', function(env, picker) {
     // load into the pickers the values, showing a spinner
     var loader = $('#loaderImage');
     loader.show();
     var dates = $('#dateinput').val().split('-');
-
-    $.getJSON( '/get_report.json',
-        {
-            'from': dates[0].trim(),
-            'to': dates[1].trim(),
-            'report': '${report}',
-            'intersection':'${intersection}'
-        },
-        function(data) {
-            var newData = []
-            $.each(data, function(key, value) {
-                newData.append({});
-            });
-           // anomalyChart.setData(newData);
-            loader.hide();
-        }).fail(function(){
-            loader.hide();
-        });
+    location = "/reports/${intersection}/${report}?start="+dates[0].trim()+"&end="+dates[1].trim();
 });
 </script>
 <%include file="footer.html"/>

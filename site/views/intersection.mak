@@ -7,54 +7,60 @@
 <div class="container">
   <h1>Intersection: ${intersection['intersection_number']}</h1>
     <div class="row">
-
-
-            <div class="col-lg-6">
-                <div class="panel panel-default">
-                    <div class="panel-heading">
-                        <i class="fa fa-info fa-fw"></i> Info
-                    </div>
-                    <table class="table table-striped">
-                        <thead>
-                            <tr>
-                            <th>Attribute</th>
-                            <th>Value</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            % for k,v in intersection.items():
-                            <tr>
-                                <td>${k.replace('_',' ').title()}</td>
-                                <td>
-                                % if k == 'neighbours':
-                                    % for n in v:
-                                        <a href="/intersection/${n}">${n}</a>
-                                    % endfor
-                                % elif k == 'loc':
-                                    Lat: ${v['coordinates'][1]}, Lng: ${v['coordinates'][0]}
-                                % else:
-                                    ${v}
-                                % endif
-                                </td>
-                            </tr>
-                            % endfor
-                        </tbody>
-                    </table>
+        <div class="col-lg-6">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <i class="fa fa-info fa-fw"></i> Info
                 </div>
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                        <th>Attribute</th>
+                        <th>Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        % for k,v in intersection.items():
+                        <tr>
+                            <td>${k.replace('_',' ').title()}</td>
+                            <td>
+                            % if k == 'neighbours':
+                                % for n in v:
+                                    <a href="/intersection/${n}">${n}</a>
+                                % endfor
+                            % elif k == 'loc':
+                                Lat: ${v['coordinates'][1]}, Lng: ${v['coordinates'][0]}
+                            % else:
+                                ${v}
+                            % endif
+                            </td>
+                        </tr>
+                        % endfor
+                    </tbody>
+                </table>
+                <div class="panel list-group">
+                <a href="#" class="list-group-item" data-toggle="collapse" data-target="#sm" data-parent="#menu">Reports</a>
+                <div id="sm" class="sublinks collapse">
+                    % for i in reports:
+                  <a href="/reports/${intersection['intersection_number']}/${i.replace(' ','_').lower()}" class="list-group-item small">${i}</a>
+                   %endfor
+               </div>
+            </div>
+            </div>
 
-            </div>
-            <div class="col-lg-6">
-                <div class="panel panel-default">
-                    <div class="panel-heading">
-                        <i class="fa fa-map fa-fw"></i> Map
-                    </div>
-                    <div class="panel-body">
-                        <div style="height:200px" id="map"></div>
-                    </div>
-                    <!-- /.panel-body -->
+        </div>
+        <div class="col-lg-6">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <i class="fa fa-map fa-fw"></i> Map
                 </div>
-                <% include file="time_range_panel.html"/>
+                <div class="panel-body">
+                    <div style="height:200px" id="map"></div>
+                </div>
+                <!-- /.panel-body -->
             </div>
+            <%include file="time_range_panel.html"/>
+        </div>
     </div>
     <div class="row">
         <div class="col-lg-12">
@@ -88,7 +94,7 @@
 var aData =[
        % for i in scores:
         % if 'anomaly_score' in i:
-          [new Date('${i['datetime'].strftime('${date_format}')}'), ${i['anomaly_score']}],
+          [new Date(Date.UTC(${"{},{},{},{},{}".format(i['datetime'].year, i['datetime'].month-1, i['datetime'].day, i['datetime'].hour, i['datetime'].minute)})), ${i['anomaly_score']}],
         % endif
        % endfor
     /*   [new Date("2012-11-19"),0.1],
@@ -102,7 +108,7 @@ var aData =[
 
 var pData = [
     % for i in scores:
-        [new Date('${i['datetime'].strftime(date_format)}') ,
+        [new Date(Date.UTC(${"{},{},{},{},{}".format(i['datetime'].year, i['datetime'].month-1, i['datetime'].day, i['datetime'].hour, i['datetime'].minute)})),
         % if i['readings'][predIdx]['vehicle_count'] < 2040:
         ${sum(filter(lambda x: x<2040,pluck(i['readings'],'vehicle_count')))}
         %endif
@@ -124,6 +130,7 @@ if (aData.length ==0) {
       title: 'Anomaly',
       ylabel: 'Anomaly',
       xlabel: 'Date',
+      labelsUTC: true,
       anomaly: {
             color: "red",
             strokeWidth: 2.0,
@@ -131,7 +138,8 @@ if (aData.length ==0) {
                 valueRange: [0, 1.2]
             }
         },
-      labels: ['date', 'anomaly']
+      labels: ['date', 'anomaly'],
+       <%include file="dygraph_weekend.js"/>
     });
 }
 if (pData.length ==0) {
@@ -145,7 +153,9 @@ if (pData.length ==0) {
       title: 'Prediction',
       ylabel: 'Volume',
       xlabel: 'Date',
-      labels: ['Date','Sum'/*,'Prediction'*/]
+      labelsUTC: true,
+      labels: ['UTC','Sum'/*,'Prediction'*/],
+      <%include file="dygraph_weekend.js"/>
     });
 }
 

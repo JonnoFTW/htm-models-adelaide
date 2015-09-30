@@ -109,7 +109,7 @@ def writeModelParams(params, intersection):
     paramsName = "model_params_%s.py" % intersection
     outPath = os.path.join(getEngineDir(), MODEL_PARAMS_DIR, paramsName)
     with open(outPath, 'wb') as outfile:
-        outfile.write("MODEL_PARAMS = \\\n%s" % pprint.PrettyPrint(indent=2).pformat(params))
+        outfile.write("MODEL_PARAMS = \\\n%s" % pprint.pformat(params, indent=2))
     return outPath
 
 
