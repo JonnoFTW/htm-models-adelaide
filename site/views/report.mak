@@ -2,7 +2,7 @@
 <div class="container">
 <%
  report_title = report.replace('_',' ').title().replace('Am','AM').replace('Pm','PM')
- data_exists = len(datas) > 0 and len(datas[0]['data']) > 0
+ data_exists = len(data) > 0
  if data_exists:
     start_title = min(datas[0]['data'])[0].strftime('%d/%m/%Y')
     end_title = max(datas[0]['data'])[0].strftime('%d/%m/%Y')
@@ -68,7 +68,6 @@
        </div>
     </div>
 
-% for data in datas:
   <div class="row">
         <div class="col-lg-12">
             <div class="panel panel-default">
@@ -76,7 +75,7 @@
                     <i class="fa fa-line-chart fa-fw"></i> Chart
                 </div>
                 <div class="panel-body">
-                   <figure style="width: 100%; height: 300px;"  id="chart-${data['name']}"></figure>
+                   <figure style="width: 100%; height: 300px;"  id="chart"></figure>
                 </div>
             </div>
         </div>
@@ -95,7 +94,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        % for k,v in data['data']:
+                        % for k,v in data:
                         <tr>
                             <td>${k}</td>
                             <td>${v}</td>
@@ -108,25 +107,20 @@
     </div>
 
 <script type="text/javascript">
-var data${data['name']} =[
-   % for k,v in data['data']:
+var data =[
+   % for k,v in data:
       [new Date(Date.UTC(${"{},{},{}".format(k.year, k.month-1, k.day)})), ${v}],
    % endfor
 ];
-if (data${data['name']}.length ==0) {
+if (data.length ==0) {
     $('#chart').before('<div class="bs-callout bs-callout-danger">\
   <h4>Nothing to Display!</h4>\
   There\'s no values for this time period. There\'s probably no data yet.\
 </div>').height('0');
 } else {
-    var chart = new Dygraph(document.getElementById('chart-${data['name']}'), data${data['name']}, {
+    var chart = new Dygraph(document.getElementById('chart'), data, {
       legend: 'always',
-      %if 'chart-title' in data:
-      title: '${data['chart-title']} for ${start_title} - ${end_title}',
-      %else:
       title: '${report_title} for ${start_title} - ${end_title}',
-      %endif
-
       ylabel: 'Volume',
       xlabel: 'Date',
       labelsUTC: true,
@@ -151,7 +145,6 @@ if (data${data['name']}.length ==0) {
     });
 }
 </script>
-%endfor
 %endif
 </div>
 <script type="text/javascript">

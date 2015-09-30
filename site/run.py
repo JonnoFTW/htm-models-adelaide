@@ -14,11 +14,12 @@ from pyramid.events import subscriber
 from pyramid.events import BeforeRender
 
 
-REPORTS = ('Daily Total', 'AM Peak', 'PM Peak',
+REPORTS = ('Daily Total', 'Monthly Average', 'AM Peak', 'PM Peak',
            'Highest Peak Volumes', 'Highest AM Peaks',
            'Highest PM Peaks', 'Phase Splits',
            'Degree of Saturation', 'VO VK Ratio')
 fmt = '%d.%m.%Y'
+
 
 def get_site_dir():
     return os.path.dirname(os.path.realpath(__file__))
@@ -41,6 +42,7 @@ def add_global(event):
     event['date_format'] = '%Y-%m-%d %H:%M'
     event['reports'] = REPORTS
 
+
 def _get_mongo_client():
     """
     Give you a pymongoclient for the database
@@ -58,7 +60,7 @@ def _get_intersection(intersection):
     """
   #  return _get_intersections()[0]
     with _get_mongo_client() as client:
-        coll = client.mack0242['locations']
+        coll = client[mongo_database]['locations']
         return coll.find_one({'intersection_number': intersection})
 
 
@@ -144,42 +146,37 @@ def _get_daily_volume(data, hour=None):
     return counter
 
 
-def _wrap_datas(datas):
-    return [
-        {'name': i, 'data': j} for i, j in enumerate(datas)
-    ]
-
-
-def _daily_volume(data):
-    daily_volumes = _get_daily_volume(data)
+def _monthly_average(data):
     monthly_average = Counter()
-    for i, j in daily_volumes.items():
+    for i, j in _get_daily_volume(data).items():
         monthly_average[date(i.year, i.month, 1)] += j
     for i in monthly_average:
         monthly_average[i] /= monthrange(i.year, i.month)[1]
-    datas = _wrap_datas([sorted(daily_volumes.items()), sorted(monthly_average.items())])
-    datas[1]['chart-title'] = "Monthly Average"
-    return datas
+    return sorted(monthly_average.items())
+
+
+def _daily_volume(data):
+    return sorted(_get_daily_volume(data).items())
 
 
 def _am_peak(data):
-    return _wrap_datas([sorted(_get_daily_volume(data, 8).items())])
+    return sorted(_get_daily_volume(data, 8).items())
 
 
 def _pm_peak(data):
-    return _wrap_datas([sorted(_get_daily_volume(data, 15).items())])
+    return sorted(_get_daily_volume(data, 15).items())
 
 
 def _highest_peak_volumes(data):
-    return _wrap_datas([sorted(_get_daily_volume(data).most_common(30), key=lambda x:x[1], reverse=True)])
+    return sorted(_get_daily_volume(data).most_common(30), key=lambda x:x[1], reverse=True)
 
 
 def _highest_am_peaks(data):
-    return _wrap_datas([sorted(_get_daily_volume(data, 8).most_common(30), key=lambda x:x[1], reverse=True)])
+    return sorted(_get_daily_volume(data, 8).most_common(30), key=lambda x:x[1], reverse=True)
 
 
 def _highest_pm_peaks(data):
-    return _wrap_datas([sorted(_get_daily_volume(data, 15).most_common(30), key=lambda x:x[1], reverse=True)])
+    return sorted(_get_daily_volume(data, 15).most_common(30), key=lambda x:x[1], reverse=True)
 
 
 def _phase_splits(data):
@@ -205,7 +202,7 @@ def _get_report(intersection, report, start=None, end=None):
     """
 
     report_funcs = dict(zip(map(lambda x: x.lower().replace(' ', '_'), REPORTS),
-                            [_daily_volume, _am_peak, _pm_peak, _highest_peak_volumes,
+                            [_daily_volume, _monthly_average, _am_peak, _pm_peak, _highest_peak_volumes,
                              _highest_am_peaks, _highest_pm_peaks, _phase_splits,
                              _saturation_degree, _vo_vk_ratio]))
     if report not in report_funcs:
@@ -244,7 +241,7 @@ def show_report(request):
         stats = "Error"
     return render_to_response(
         'views/report.mak',
-        {'datas': data,
+        {'data': data,
          'report': args['report'],
          'intersection': intersection,
          'stats': stats,
