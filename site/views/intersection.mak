@@ -1,8 +1,9 @@
-<%!
+<%include file="header.html"/>
+<%
     from pluck import pluck
+    has_predictions = 'prediction' in scores[0]
 %>
 
-<%include file="header.html"/>
 <script type="text/javascript" src="//cdn.jsdelivr.net/bootstrap.daterangepicker/2/daterangepicker.js"></script>
 <div class="container">
   <h1>Intersection: ${intersection['intersection_number']}</h1>
@@ -90,7 +91,6 @@
     </div>
 </div>
 <script type="text/javascript">
-<!-- ${scores[0]} -->
 var aData =[
        % for i in scores:
         % if 'anomaly_score' in i:
@@ -102,12 +102,13 @@ var aData =[
 var pData = [
     % for i in scores:
         [new Date(Date.UTC(${"{},{},{},{},{}".format(i['datetime'].year, i['datetime'].month-1, i['datetime'].day, i['datetime'].hour, i['datetime'].minute)})),
-        % if i['readings'][predIdx]['vehicle_count'] < 2040:
+        %if has_predictions:
+         % if i['readings'][predIdx]['vehicle_count'] < 2040:
             ${i['readings'][predIdx]['vehicle_count']},
-        ## ${sum(filter(lambda x: x<2040,pluck(i['readings'],'vehicle_count')))},
-        %endif
-        % if 'prediction' in i:
             ${i['prediction']['prediction']},
+         %endif
+        %else:
+         ${sum(filter(lambda x: x<2040,pluck(i['readings'],'vehicle_count')))},
         %endif
         ],
     % endfor
@@ -160,11 +161,18 @@ if (pData.length ==0) {
 } else {
     var predictionChart = new Dygraph(document.getElementById('prediction-chart'), pData, {
       legend: 'always',
-      title: 'Prediction and Observation on Sensor: ${scores[0]['prediction']['sensor']}',
+      %if has_predictions:
+          title: 'Prediction and Observation on Sensor: ${scores[0]['prediction']['sensor']}',
+          labels: ['UTC','Reading','Prediction'],
+      %else:
+        title: 'Total Traffic Flow for intersection ${intersection['intersection_number']}',
+        labels: ['UTC','Reading'],
+      %endif
       ylabel: 'Volume',
       xlabel: 'Date',
       labelsUTC: true,
-      labels: ['UTC','Reading','Prediction'],
+
+
       zoomCallback: function(min, max, yRanges) {
             zoomGraph(anomalyChart, min, max);
       },
