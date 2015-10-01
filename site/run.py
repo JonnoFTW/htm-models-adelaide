@@ -59,10 +59,21 @@ def _get_intersection(intersection):
     Get information for a single intersection
     :return: a dict with the info
     """
-  #  return _get_intersections()[0]
     with _get_mongo_client() as client:
         coll = client[mongo_database]['locations']
         return coll.find_one({'intersection_number': intersection})
+
+
+def _get_neighbours(intersection):
+    """
+
+    :param intersection:
+    :return:
+    """
+    center = _get_intersection(intersection)
+    with _get_mongo_client() as client:
+        coll = client[mongo_database]['locations']
+        return list(coll.find({'intersection_number': {'$in': center['neighbours']}}))
 
 
 def _get_intersections():
@@ -307,8 +318,10 @@ def show_intersection(request):
 
     args = request.matchdict
     # show specific intersection if it exists
-    intersection = _get_intersection(args['site_no'])
-    anomaly_score = list(get_anomaly_scores(intersection=args['site_no']))
+    site = args['site_no']
+    intersection = _get_intersection(site)
+    intersection['neighbours'] = _get_neighbours(site)
+    anomaly_score = list(get_anomaly_scores(intersection=site))
     predIdx = -1
     if len(anomaly_score) > 0:
         try:

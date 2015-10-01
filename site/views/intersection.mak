@@ -27,7 +27,7 @@
                             <td>
                             % if k == 'neighbours':
                                 % for n in v:
-                                    <a href="/intersection/${n}">${n}</a>
+                                    <a href="/intersection/${n['intersection_number']}">${n['intersection_number']}</a>
                                 % endfor
                             % elif k == 'loc':
                                 Lat: ${v['coordinates'][1]}, Lng: ${v['coordinates'][0]}
@@ -241,7 +241,7 @@ $(document).ready(function() {
     lat: lat,
     lng: lng,
     div: '#map',
-    zoom: 16
+    zoom: 15
   });
 
   map.addMarker({
@@ -249,6 +249,14 @@ $(document).ready(function() {
     lng: lng,
     title: '${intersection['intersection_number']}'
   });
+  %for i in intersection['neighbours']:
+    map.addMarker({
+         lat: ${i['loc']['coordinates'][1]},
+         lng: ${i['loc']['coordinates'][0]},
+         title: '${i['intersection_number']}',
+         infoWindow:{content: '<a href="/intersection/'+${i['intersection_number']}+'">'+${i['intersection_number']}+'</a>'}
+    });
+  %endfor
 });
 </script>
 
