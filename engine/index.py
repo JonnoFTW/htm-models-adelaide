@@ -22,7 +22,10 @@ def getEngineDir():
 try:
     path = os.path.join(os.path.dirname(getEngineDir()), 'connection.yaml')
     with open(path, 'r') as f:
-        mongo_uri = yaml.load(f)['mongo_uri']
+        conf = yaml.load(f)
+        mongo_uri =conf['mongo_uri']
+        mongo_database = conf['mongo_database']
+        mongo_collection = conf['mongo_collection']
 except:
     raise Exception('No connection.yaml with mongo_uri defined! please make one with a mongo_uri variable')
 
@@ -60,14 +63,15 @@ def createModel(modelParams, intersection):
     else:
         print "Creating model for %s..." % intersection
         model = ModelFactory.create(modelParams)
-        model.enableInterface({'predictedField': "vehicle_count"})
+        pField = getSwarmConfig(intersection)['inferenceArgs']['predictedField']
+        model.enableInference({'predictedField': pField})
         return model
 
 
 def getMax():
      with pymongo.MongoClient(mongo_uri) as client:
-        db = client.mack0242
-        collection = db['ACC_201306_20130819113933']
+        db = client[mongo_database]
+        collection = db[mongo_collection]
         readings = collection.find()
         print "Max vehicle count:", max([max(
             filter(lambda x:x < 2040, pluck(i['readings'], 'vehicle_count'))) for i in readings])
@@ -165,7 +169,8 @@ def runIoThroughNupic(readings, model, intersection, output, write_anomaly, coll
             if vc > 2040:
                 vc = None
             fields[j['sensor']] = vc
-            flows[p] = vc
+            if output:
+                flows[p] = vc
         result = model.run(fields)
         if output == 'plot':
           result = shifter.shift(result)
@@ -182,18 +187,19 @@ def runIoThroughNupic(readings, model, intersection, output, write_anomaly, coll
         if output:
             output.write(timestamp, flows, prediction, anomalyScore)
         flows = np.empty(num_readings, dtype=np.uint16)
-    output.close()
+    if output:
+        output.close()
 
 
 def runModel(intersection, output, swarm, write_anomaly):
     modelParams = getModelParamsFromName(intersection, swarm)
     with pymongo.MongoClient(mongo_uri) as client:
-        db = client.mack0242
-        collection = db['ACC_201306_20130819113933']
-        readings = collection.find({'intersection_number': intersection})
+        db = client[mongo_database]
+        collection = db[mongo_collection]
+        readings = collection.find({'site_no': intersection}).sort('datetime', pymongo.ASCENDING)
         if readings.count() == 0:
             sys.exit("No such intersection '%s' exists or it has no readings saved!" % intersection)
-        model = createModel(modelParams)
+        model = createModel(modelParams, intersection)
         try:
             runIoThroughNupic(readings, model, intersection, output, write_anomaly, collection)
         except KeyboardInterrupt:
@@ -209,5 +215,6 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     setupFolders()
+
     runModel(args.intersection, args.output, args.swarm, args.write_anomaly)
 

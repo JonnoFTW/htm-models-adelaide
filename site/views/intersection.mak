@@ -90,27 +90,21 @@
     </div>
 </div>
 <script type="text/javascript">
-
+<!-- ${scores[0]} -->
 var aData =[
        % for i in scores:
         % if 'anomaly_score' in i:
           [new Date(Date.UTC(${"{},{},{},{},{}".format(i['datetime'].year, i['datetime'].month-1, i['datetime'].day, i['datetime'].hour, i['datetime'].minute)})), ${i['anomaly_score']}],
         % endif
        % endfor
-    /*   [new Date("2012-11-19"),0.1],
-[new Date("2012-11-20"),0.2],
-[new Date("2012-11-21"),0.4],
-[new Date("2012-11-22"),0.6],
-[new Date("2012-11-23"),0.7],
-[new Date("2012-11-24"),0.9],
-[new Date("2012-11-25"),0.99]*/
 ];
 
 var pData = [
     % for i in scores:
         [new Date(Date.UTC(${"{},{},{},{},{}".format(i['datetime'].year, i['datetime'].month-1, i['datetime'].day, i['datetime'].hour, i['datetime'].minute)})),
         % if i['readings'][predIdx]['vehicle_count'] < 2040:
-        ${sum(filter(lambda x: x<2040,pluck(i['readings'],'vehicle_count')))}
+            ${i['readings'][predIdx]['vehicle_count']},
+        ## ${sum(filter(lambda x: x<2040,pluck(i['readings'],'vehicle_count')))},
         %endif
         % if 'prediction' in i:
             ${i['prediction']['prediction']},
@@ -118,6 +112,16 @@ var pData = [
         ],
     % endfor
 ];
+
+var zoomGraph = function(graph, min, max) {
+    graph.updateOptions({
+        dateWindow: [min, max]
+    });
+};
+var highlightX = function(graph, row) {
+    graph.setSelection(row);
+};
+
 var dispFormat = "%d/%m/%y %H:%M";
 if (aData.length ==0) {
     $('#anomaly-chart').before('<div class="bs-callout bs-callout-danger">\
@@ -127,7 +131,7 @@ if (aData.length ==0) {
 } else {
     var anomalyChart = new Dygraph(document.getElementById('anomaly-chart'), aData, {
       legend: 'always',
-      title: 'Anomaly',
+      title: 'Anomaly value for intersection ${intersection['intersection_number']}',
       ylabel: 'Anomaly',
       xlabel: 'Date',
       labelsUTC: true,
@@ -138,7 +142,13 @@ if (aData.length ==0) {
                 valueRange: [0, 1.2]
             }
         },
-      labels: ['date', 'anomaly'],
+      zoomCallback: function(min, max, yRanges) {
+          zoomGraph(predictionChart, min, max);
+      },
+      highlightCallback: function(event, x, point, row, seriesName) {
+          highlightX(predictionChart, row);
+      },
+      labels: ['UTC', 'anomaly'],
        <%include file="dygraph_weekend.js"/>
     });
 }
@@ -150,11 +160,17 @@ if (pData.length ==0) {
 } else {
     var predictionChart = new Dygraph(document.getElementById('prediction-chart'), pData, {
       legend: 'always',
-      title: 'Prediction',
+      title: 'Prediction and Observation on Sensor: ${scores[0]['prediction']['sensor']}',
       ylabel: 'Volume',
       xlabel: 'Date',
       labelsUTC: true,
-      labels: ['UTC','Sum'/*,'Prediction'*/],
+      labels: ['UTC','Reading','Prediction'],
+      zoomCallback: function(min, max, yRanges) {
+            zoomGraph(anomalyChart, min, max);
+      },
+      highlightCallback: function(event, x, point, row, seriesName) {
+          highlightX(anomalyChart, row);
+      },
       <%include file="dygraph_weekend.js"/>
     });
 }

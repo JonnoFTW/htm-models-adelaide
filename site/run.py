@@ -18,7 +18,7 @@ REPORTS = ('Daily Total', 'Monthly Average', 'AM Peak', 'PM Peak',
            'Highest Peak Volumes', 'Highest AM Peaks',
            'Highest PM Peaks', 'Phase Splits',
            'Degree of Saturation', 'VO VK Ratio')
-fmt = '%d.%m.%Y'
+fmt = '%d/%m/%Y'
 
 
 def get_site_dir():
@@ -35,6 +35,7 @@ try:
 
 except:
     raise Exception('No connection.yaml with mongo_uri defined! please make one with a mongo_uri variable')
+
 
 @subscriber(BeforeRender)
 def add_global(event):
@@ -69,8 +70,6 @@ def _get_intersections():
     Get the signalised intersections for Adelaide
     :return: a cursor of documents of signalised intersections
     """
-  #  return [{'lga':'ACC','scats_region':'ACC','intersection_number':'3001','loc': {'lat':-34.9271532,'lng':138.6003676}}]
-
     with _get_mongo_client() as client:
         coll = client[mongo_database]['locations']
         return coll.find({'intersection_number': {'$exists': True}}, {'_id': False})
@@ -168,15 +167,15 @@ def _pm_peak(data):
 
 
 def _highest_peak_volumes(data):
-    return sorted(_get_daily_volume(data).most_common(30), key=lambda x:x[1], reverse=True)
+    return sorted(_get_daily_volume(data).most_common(30), key=lambda x: x[1], reverse=True)
 
 
 def _highest_am_peaks(data):
-    return sorted(_get_daily_volume(data, 8).most_common(30), key=lambda x:x[1], reverse=True)
+    return sorted(_get_daily_volume(data, 8).most_common(30), key=lambda x: x[1], reverse=True)
 
 
 def _highest_pm_peaks(data):
-    return sorted(_get_daily_volume(data, 15).most_common(30), key=lambda x:x[1], reverse=True)
+    return sorted(_get_daily_volume(data, 15).most_common(30), key=lambda x: x[1], reverse=True)
 
 
 def _phase_splits(data):
@@ -216,7 +215,7 @@ def _get_report(intersection, report, start=None, end=None):
         coll = client[mongo_database][mongo_collection]
         query = {'site_no': intersection}
         if start and end:
-            query['datetime'] = {'$gte': start, '$lte': end }
+            query['datetime'] = {'$gte': start, '$lte': end}
         data = coll.find(query)
         return report_funcs[report](data), intersection, start, end
 
@@ -234,8 +233,8 @@ def show_report(request):
     if 'end' in request.GET:
         end = datetime.strptime(request.GET['end'], fmt)
     data, intersection, start, end = _get_report(args['intersection'], args['report'], start, end)
-    if len(data[0]['data']):
-        arr = numpy.array([i[1] for i in data[0]['data']])
+    if len(data):
+        arr = numpy.array([i[1] for i in data])
         stats = {'std': numpy.std(arr), 'avg': numpy.average(arr)}
     else:
         stats = "Error"
