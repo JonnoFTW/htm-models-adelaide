@@ -21,7 +21,8 @@ $(document).ready(function(){
           lng: v['loc']['coordinates'][0],
           title: v['intersection_number'],
           infoWindow: {
-            content: '<h3><a href="/intersection/'+v['intersection_number']+'">'+v['intersection_number']+'</a></h3>'
+            content: '<div class="panel panel-default"><div class="panel-heading">'+
+            '<a href="/intersection/'+v['intersection_number']+'">'+v['intersection_number']+'</a></div></div>'
           }
       });
 

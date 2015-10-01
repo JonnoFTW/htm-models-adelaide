@@ -67,7 +67,12 @@
         <div class="col-lg-12">
             <div class="panel panel-default">
                 <div class="panel-heading">
-                    <i class="fa fa-line-chart fa-fw"></i> Predictions for Sensor:
+                    <i class="fa fa-line-chart fa-fw"></i>
+                    %if has_predictions:
+                        Prediction and Observation on Sensor: ${scores[0]['prediction']['sensor']}
+                    %else:
+                        Total Traffic Flow for intersection ${intersection['intersection_number']}
+                    %endif
                      ## ${scores['prediction']['sensor']}
                 </div>
                 <div class="panel-body">
@@ -139,9 +144,6 @@ if (aData.length ==0) {
       anomaly: {
             color: "red",
             strokeWidth: 2.0,
-            axis: {
-                valueRange: [0, 1.2]
-            }
         },
       zoomCallback: function(min, max, yRanges) {
           zoomGraph(predictionChart, min, max);
@@ -182,13 +184,18 @@ if (pData.length ==0) {
       <%include file="dygraph_weekend.js"/>
     });
 }
-
+<%
+start_title = scores[0]['datetime'].strftime('%d/%m/%Y')
+end_title = scores[-1]['datetime'].strftime('%d/%m/%Y')
+%>
 $('input[name="daterange"]').daterangepicker({
     timePicker: true,
     timePickerIncrement: 5,
     locale: {
         format: 'DD/MM/YYYY H:mm'
-    }
+    },
+    startDate: '${start_title}',
+    endDate: '${end_title}'
 }).on('apply.daterangepicker', function(env, picker) {
     // load into the pickers the values, showing a spinner
     var loader = $('#loaderImage');
