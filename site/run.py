@@ -71,6 +71,8 @@ def _get_neighbours(intersection):
     :return:
     """
     center = _get_intersection(intersection)
+    if 'neighbours' not in center or len(center['neighbours']) == 0:
+        return []
     with _get_mongo_client() as client:
         coll = client[mongo_database]['locations']
         return list(coll.find({'intersection_number': {'$in': center['neighbours']}}))
@@ -321,10 +323,12 @@ def show_intersection(request):
     site = args['site_no']
     intersection = _get_intersection(site)
     intersection['neighbours'] = _get_neighbours(site)
+
     anomaly_score = list(get_anomaly_scores(intersection=site))
     predIdx = -1
     if len(anomaly_score) > 0:
         try:
+            intersection['sensors'] = len(anomaly_score[0]['readings'])
             predIdx = next(index for (index, d) in enumerate(anomaly_score[0]['readings'])
                      if d["sensor"] == anomaly_score[0]['prediction']['sensor'])
         except:

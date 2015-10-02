@@ -1,13 +1,15 @@
 #!/usr/bin/env python2.7
+from multiprocessing import Pool
 import sys
 import argparse
 import importlib
 import os
 import pprint
-
+import time
 import pymongo
 from pluck import pluck
 import numpy as np
+
 from nupic.frameworks.opf.modelfactory import ModelFactory
 from nupic.data.inference_shifter import InferenceShifter
 from nupic.swarming import permutations_runner
@@ -19,16 +21,16 @@ import yaml
 def getEngineDir():
     return os.path.dirname(os.path.realpath(__file__))
 
+
 try:
     path = os.path.join(os.path.dirname(getEngineDir()), 'connection.yaml')
     with open(path, 'r') as f:
         conf = yaml.load(f)
-        mongo_uri =conf['mongo_uri']
+        mongo_uri = conf['mongo_uri']
         mongo_database = conf['mongo_database']
         mongo_collection = conf['mongo_collection']
 except:
     raise Exception('No connection.yaml with mongo_uri defined! please make one with a mongo_uri variable')
-
 
 DESCRIPTION = """
 Makes and runs a NuPIC model for an intersection in Adelaide and
@@ -38,7 +40,7 @@ MODEL_PARAMS_DIR = "model_params"
 MODEL_CACHE_DIR = "model_store"
 SWARM_CONFIGS_DIR = "swarm_configs"
 MIN_COUNT = 0
-MAX_COUNT = 192 # a reasonable assumption based on TS3001
+MAX_COUNT = 192  # a reasonable assumption based on TS3001
 
 
 def setupFolders():
@@ -56,25 +58,26 @@ def getModelDir(intersection):
 
 def createModel(modelParams, intersection):
     modelDir = getModelDir(intersection)
-    if os.path.isdir(modelDir):
+    if False: #os.path.isdir(modelDir):
         # Read in the cached model
         print "Loading cached model for %s..." % intersection
         model = ModelFactory.loadFromCheckpoint(modelDir)
     else:
         print "Creating model for %s..." % intersection
         model = ModelFactory.create(modelParams)
-        pField = getSwarmConfig(intersection)['inferenceArgs']['predictedField']
+        model.site_no = intersection
+        pField = '152' #getSwarmConfig(intersection)['inferenceArgs']['predictedField']
         model.enableInference({'predictedField': pField})
         return model
 
 
 def getMax():
-     with pymongo.MongoClient(mongo_uri) as client:
+    with pymongo.MongoClient(mongo_uri) as client:
         db = client[mongo_database]
         collection = db[mongo_collection]
         readings = collection.find()
         print "Max vehicle count:", max([max(
-            filter(lambda x:x < 2040, pluck(i['readings'], 'vehicle_count'))) for i in readings])
+            filter(lambda x: x < 2040, pluck(i['readings'], 'vehicle_count'))) for i in readings])
 
 
 def getSwarmConfig(intersection):
@@ -124,7 +127,7 @@ def swarmParams(swarmConfig, intersection):
         os.mkdir(permWorkDir)
     import multiprocessing as mp
     # use 3/4 of your CPUs
-    maxWorkers = 3 * mp.cpu_count()/2
+    maxWorkers = 3 * mp.cpu_count() / 2
     print "Running swarm!"
     modelParams = permutations_runner.runWithConfig(
         swarmConfig,
@@ -173,22 +176,63 @@ def runIoThroughNupic(readings, model, intersection, output, write_anomaly, coll
                 flows[p] = vc
         result = model.run(fields)
         if output == 'plot':
-          result = shifter.shift(result)
-
+            result = shifter.shift(result)
         prediction = result.inferences["multiStepBestPredictions"][1]
         anomalyScore = result.inferences["anomalyScore"]
         if write_anomaly:
-            collection.update_one({"_id": i["_id"]},
-                                  {"$set": {"anomaly_score": anomalyScore,
-                                            "prediction": {
-                                                'sensor': pfield,
-                                                'prediction': prediction
-                                            }}})
+            write_anomaly_out(i, anomalyScore, pfield, prediction, collection)
         if output:
             output.write(timestamp, flows, prediction, anomalyScore)
         flows = np.empty(num_readings, dtype=np.uint16)
     if output:
         output.close()
+
+
+def write_anomaly_out(doc, anomalyScore, pfield, prediction, collection):
+    collection.update_one({"_id": doc["_id"]},
+                          {"$set": {"anomaly_score": anomalyScore,
+                                    "prediction": {
+                                        'sensor': pfield,
+                                        'prediction': prediction
+                                    }}})
+
+
+def save_model(model):
+    out_dir = getModelDir(model.site_no)
+    print "Caching model to", out_dir
+    model.save(getModelDir(model.site_no))
+
+
+def run_single_intersection(args):
+    intersection, modelParams, write_anomaly = args[0], args[1], args[2]
+    start_time = time.time()
+    with pymongo.MongoClient(mongo_uri) as client:
+        collection = client[mongo_database][mongo_collection]
+        readings = collection.find({'site_no': intersection}).sort('datetime', pymongo.ASCENDING)
+        model = createModel(modelParams, intersection)
+        pfield = model.getInferenceArgs()['predictedField']
+        for i in readings:
+            timestamp = i['datetime']
+            fields = {
+                "timestamp": timestamp
+            }
+            for p, j in enumerate(i['readings']):
+                vc = j['vehicle_count']
+                if vc > 2040:
+                    vc = None
+                fields[j['sensor']] = vc
+            result = model.run(fields)
+            prediction = result.inferences["multiStepBestPredictions"][1]
+            anomaly_score = result.inferences["anomalyScore"]
+            if write_anomaly:
+                write_anomaly_out(i, anomaly_score, pfield, prediction, collection)
+    print("Intersection %s: --- %s seconds ---" % (intersection, time.time() - start_time))
+
+
+def run_all(locations, write_anomaly):
+    modelParams = getModelParamsFromName('3001', False)
+    pool = Pool(processes=8)
+    pool.map(run_single_intersection, [(i['intersection_number'], modelParams, write_anomaly) for i in locations])
 
 
 def runModel(intersection, output, swarm, write_anomaly):
@@ -206,15 +250,28 @@ def runModel(intersection, output, swarm, write_anomaly):
             model.save(getModelDir(intersection))
 
 
+def runAllModels(write_anomaly):
+    with pymongo.MongoClient(mongo_uri) as client:
+        collection = client[mongo_database]['locations']
+        start_time = time.time()
+        locations = collection.find({'intersection_number': {'$regex': '3\d\d\d'}})
+        run_all(locations, write_anomaly)
+        print("TOTAL TIME: --- %s seconds ---" % (time.time() - start_time))
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=DESCRIPTION)
     parser.add_argument('--output', type=str, help="Output anomaly scores to :", choices=['csv', 'plot'])
     parser.add_argument('--swarm', help="Create model params via swarming", action='store_true')
     parser.add_argument('--write-anomaly', help="Write the anomaly score back into the document", action='store_true')
-    parser.add_argument('intersection', type=str, help="Name of the intersection", default=3001)
+    parser.add_argument('--all', help="Run all readings through model", action="store_true")
+    parser.add_argument('--intersection', type=str, help="Name of the intersection")
 
     args = parser.parse_args()
     setupFolders()
-
-    runModel(args.intersection, args.output, args.swarm, args.write_anomaly)
-
+    if args.all and args.intersection:
+        parser.error("You can't specify an intersection when running all intersections")
+    elif args.all:
+        runAllModels(args.write_anomaly)
+    else:
+        runModel(args.intersection, args.output, args.swarm, args.write_anomaly)
