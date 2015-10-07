@@ -1,4 +1,5 @@
 #!/usr/bin/env python2.7
+from collections import Counter
 from multiprocessing import Pool
 import sys
 import argparse
@@ -7,12 +8,12 @@ import os
 import pprint
 import time
 import pymongo
-from pluck import pluck
 import numpy as np
 
 from nupic.frameworks.opf.modelfactory import ModelFactory
 from nupic.data.inference_shifter import InferenceShifter
 from nupic.swarming import permutations_runner
+import pyprind
 
 import nupic_anomaly_output
 import yaml
@@ -56,28 +57,76 @@ def getModelDir(intersection):
     return os.path.join(getEngineDir(), MODEL_CACHE_DIR, intersection)
 
 
+def get_most_used_sensors(intersection):
+    with pymongo.MongoClient(mongo_uri) as client:
+        collection = client[mongo_database][mongo_collection]
+        records = collection.find({'site_no': intersection})
+        counter = Counter()
+        for i in records:
+            for s, c in i['readings'].items():
+                if c < 2040:
+                    counter[s] += c
+        return counter
+
+
 def createModel(modelParams, intersection):
     modelDir = getModelDir(intersection)
-    if False: #os.path.isdir(modelDir):
+    if False and os.path.isdir(modelDir):
         # Read in the cached model
-        print "Loading cached model for %s..." % intersection
-        model = ModelFactory.loadFromCheckpoint(modelDir)
+        print "Loading cached model for %s from %s..." % (intersection, modelDir)
+        return ModelFactory.loadFromCheckpoint(modelDir)
     else:
+        # redo the modelParams to use the actual sensor names
+        modelParams['modelParams']['sensorParams']['encoders'].clear()
+        sensor_counts = get_most_used_sensors(intersection)
+        # try:
+        #     pField = getSwarmConfig(intersection)['inferenceArgs']['predictedField']
+        # except:
+        #     print "Determining most used sensor for ", intersection
+        try:
+            counts = sensor_counts.most_common(1)
+            if counts[0][1] == 0:
+                return None
+            else:
+                pField = counts[0][0]
+        except:
+            return None
+        print "Using", pField, "as predictedField for", intersection
+        with pymongo.MongoClient(mongo_uri) as client:
+            collection = client[mongo_database][mongo_collection]
+            doc = collection.find_one({'site_no': intersection})
+
+            for k, v in doc['readings'].items():
+                # don't model unused sensors
+                # could run into errors when the sensor
+                # was damaged for more than the sample period though
+                if sensor_counts[k] == 0:
+                    continue
+                modelParams['modelParams']['sensorParams']['encoders'][k] = {
+                    'clipInput': True,
+                    'fieldname': k,
+                    'maxval': 200,
+                    'minval': 0,
+                    'n': 22,
+                    'name': k,
+                    'type': 'ScalarEncoder',
+                    'w': 21
+                }
+
         print "Creating model for %s..." % intersection
         model = ModelFactory.create(modelParams)
         model.site_no = intersection
-        pField = '152' #getSwarmConfig(intersection)['inferenceArgs']['predictedField']
+        model.encoders = modelParams['modelParams']['sensorParams']['encoders'].keys()
         model.enableInference({'predictedField': pField})
         return model
 
 
 def getMax():
     with pymongo.MongoClient(mongo_uri) as client:
-        db = client[mongo_database]
-        collection = db[mongo_collection]
+        collection = client[mongo_database][mongo_collection]
         readings = collection.find()
         print "Max vehicle count:", max([max(
-            filter(lambda x: x < 2040, pluck(i['readings'], 'vehicle_count'))) for i in readings])
+            filter(lambda x: x < 2040, i.values())) for i in readings])
 
 
 def getSwarmConfig(intersection):
@@ -149,29 +198,24 @@ def runIoThroughNupic(readings, model, intersection, output, write_anomaly, coll
     elif output == 'csv':
         output = nupic_anomaly_output.NuPICFileOutput(intersection, pfield)
     counter = 0
+    total = readings.count()
     num_readings = len(readings[0]['readings'])
     flows = np.empty(num_readings, dtype=np.uint16)
-    # should probably use a message queue here or something
-    # running a data through a model could take a while
-    # and will block, if we multithread or multiprocess it could
-    # be good. Have a pool of processes, each assigned to process
-    # data for a particular set of models
-
-
-    # also investigate re analysing data near the start
+    progBar = pyprind.ProgBar(total, width=60)
     for i in readings:
         counter += 1
-        if counter % 100 == 0:
-            print "Read %i lines..." % counter
+        progBar.update()
         timestamp = i['datetime']
         fields = {
             "timestamp": timestamp
         }
-        for p, j in enumerate(i['readings']):
-            vc = j['vehicle_count']
+        for p, j in enumerate(i['readings'].items()):
+            if j[0] not in model.encoders:
+                continue
+            vc = j[1]
             if vc > 2040:
                 vc = None
-            fields[j['sensor']] = vc
+            fields[j[0]] = vc
             if output:
                 flows[p] = vc
         result = model.run(fields)
@@ -184,6 +228,7 @@ def runIoThroughNupic(readings, model, intersection, output, write_anomaly, coll
         if output:
             output.write(timestamp, flows, prediction, anomalyScore)
         flows = np.empty(num_readings, dtype=np.uint16)
+    print "\nRead", counter, "lines"
     if output:
         output.close()
 
@@ -198,9 +243,12 @@ def write_anomaly_out(doc, anomalyScore, pfield, prediction, collection):
 
 
 def save_model(model):
+    if model is None:
+        print "Not saving model"
+        return
     out_dir = getModelDir(model.site_no)
     print "Caching model to", out_dir
-    model.save(getModelDir(model.site_no))
+    model.save(out_dir)
 
 
 def run_single_intersection(args):
@@ -210,33 +258,44 @@ def run_single_intersection(args):
         collection = client[mongo_database][mongo_collection]
         readings = collection.find({'site_no': intersection}).sort('datetime', pymongo.ASCENDING)
         model = createModel(modelParams, intersection)
+        if model is None:
+            return None
         pfield = model.getInferenceArgs()['predictedField']
+        encoders = modelParams
         for i in readings:
             timestamp = i['datetime']
             fields = {
                 "timestamp": timestamp
             }
-            for p, j in enumerate(i['readings']):
-                vc = j['vehicle_count']
+            for p, j in enumerate(i['readings'].items()):
+                if j[0] not in model.encoders:
+                    continue
+                vc = j[1]
                 if vc > 2040:
                     vc = None
-                fields[j['sensor']] = vc
+                fields[j[0]] = vc
             result = model.run(fields)
             prediction = result.inferences["multiStepBestPredictions"][1]
             anomaly_score = result.inferences["anomalyScore"]
             if write_anomaly:
                 write_anomaly_out(i, anomaly_score, pfield, prediction, collection)
     print("Intersection %s: --- %s seconds ---" % (intersection, time.time() - start_time))
+    return model
 
 
-def run_all(locations, write_anomaly):
+def run_all(locations, write_anomaly, key='intersection_number'):
     modelParams = getModelParamsFromName('3001', False)
     pool = Pool(processes=8)
-    pool.map(run_single_intersection, [(i['intersection_number'], modelParams, write_anomaly) for i in locations])
+    models = pool.map(run_single_intersection,
+                   [(i[key], modelParams, write_anomaly) for i in locations])
+    map(save_model, models)
+
+
 
 
 def runModel(intersection, output, swarm, write_anomaly):
-    modelParams = getModelParamsFromName(intersection, swarm)
+    #this is a hack, not every intersection needs these particular params
+    modelParams = getModelParamsFromName('3001', swarm)
     with pymongo.MongoClient(mongo_uri) as client:
         db = client[mongo_database]
         collection = db[mongo_collection]
@@ -244,18 +303,32 @@ def runModel(intersection, output, swarm, write_anomaly):
         if readings.count() == 0:
             sys.exit("No such intersection '%s' exists or it has no readings saved!" % intersection)
         model = createModel(modelParams, intersection)
+        if model is None:
+            print "No data for", intersection
+            return
         try:
             runIoThroughNupic(readings, model, intersection, output, write_anomaly, collection)
         except KeyboardInterrupt:
-            model.save(getModelDir(intersection))
+            pass
+        finally:
+            save_model(model)
 
 
-def runAllModels(write_anomaly):
+def runAllModels(write_anomaly, incomplete):
     with pymongo.MongoClient(mongo_uri) as client:
         collection = client[mongo_database]['locations']
         start_time = time.time()
-        locations = collection.find({'intersection_number': {'$regex': '3\d\d\d'}})
-        run_all(locations, write_anomaly)
+
+        if incomplete:
+            locations, key = client[mongo_database][mongo_collection].aggregate([
+                {'$match': {'prediction.sensor': {'$eq': '152'}}},
+                {'$group': {'_id': '$site_no'}}
+            ]), '_id'
+
+        else:
+            query = {'intersection_number': {'$regex': '3\d\d\d'}}
+            locations, key = collection.find(query), 'intersection_number'
+        run_all(locations, write_anomaly, key)
         print("TOTAL TIME: --- %s seconds ---" % (time.time() - start_time))
 
 
@@ -266,12 +339,17 @@ if __name__ == "__main__":
     parser.add_argument('--write-anomaly', help="Write the anomaly score back into the document", action='store_true')
     parser.add_argument('--all', help="Run all readings through model", action="store_true")
     parser.add_argument('--intersection', type=str, help="Name of the intersection")
-
+    parser.add_argument('--incomplete', help="Analyse those intersections not done yet", action='store_true')
+    parser.add_argument('--popular', help="Show the most popular sensor for an intersection", action='store_true')
     args = parser.parse_args()
     setupFolders()
     if args.all and args.intersection:
         parser.error("You can't specify an intersection when running all intersections")
     elif args.all:
-        runAllModels(args.write_anomaly)
+        runAllModels(args.write_anomaly, args.incomplete)
+    elif args.popular:
+        print "Lane usage for ", args.intersection, "is:  "
+        for i, j in get_most_used_sensors(args.intersection).most_common():
+            print '\t', i, j
     else:
         runModel(args.intersection, args.output, args.swarm, args.write_anomaly)

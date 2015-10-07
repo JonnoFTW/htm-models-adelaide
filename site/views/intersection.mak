@@ -1,7 +1,8 @@
 <%include file="header.html"/>
 <%
-    from pluck import pluck
-    has_predictions = 'prediction' in scores[0]
+    has_anything = len(scores) > 0
+    has_predictions = has_anything and 'prediction' in scores[0]
+    del intersection['_id']
 %>
 
 <script type="text/javascript" src="//cdn.jsdelivr.net/bootstrap.daterangepicker/2/daterangepicker.js"></script>
@@ -39,9 +40,12 @@
                         % endfor
                     </tbody>
                 </table>
-                <div class="panel list-group">
-                <a href="#" class="list-group-item" data-toggle="collapse" data-target="#sm" data-parent="#menu">Reports</a>
-                <div id="sm" class="sublinks collapse">
+                <div class="panel list-group" id="accordion">
+                <a href="#" class="list-group-item" data-toggle="collapse" data-target="#sm" data-parent="#menu">Reports
+                 <span id="chevron" class="glyphicon glyphicon-chevron-up pull-right"></span>
+                </a>
+
+                <div id="sm" class="sublinks panel-collapse collapse">
                     % for i in reports:
                   <a href="/reports/${intersection['intersection_number']}/${i.replace(' ','_').lower()}" class="list-group-item small">${i}</a>
                    %endfor
@@ -63,39 +67,55 @@
             <%include file="time_range_panel.html"/>
         </div>
     </div>
-    <div class="row">
-        <div class="col-lg-12">
-            <div class="panel panel-default">
-                <div class="panel-heading">
-                    <i class="fa fa-line-chart fa-fw"></i>
-                    %if has_predictions:
-                        Prediction and Observation on Sensor: ${scores[0]['prediction']['sensor']}
-                    %else:
-                        Total Traffic Flow for intersection ${intersection['intersection_number']}
-                    %endif
-                     ## ${scores['prediction']['sensor']}
-                </div>
-                <div class="panel-body">
-                   <figure style="width: 100%; height: 300px;"  id="prediction-chart"></figure>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="row">
-        <div class="col-lg-12">
-            <div class="panel panel-default">
-                <div class="panel-heading">
-                    <i class="fa fa-line-chart fa-fw"></i> Anomaly Scores
-                </div>
-                <!-- /.panel-heading -->
-                <div class="panel-body">
-                   <figure style="width: 100%; height: 300px;"  id="anomaly-chart"></figure>
+    % if has_anything:
+
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <i class="fa fa-line-chart fa-fw"></i>
+                        %if has_predictions:
+                            Prediction and Observation on Sensor: ${scores[0]['prediction']['sensor']}
+                        %else:
+                            Total Traffic Flow for intersection ${intersection['intersection_number']}
+                        %endif
+                    </div>
+                    <div class="panel-body">
+                       <figure style="width: 100%; height: 300px;"  id="prediction-chart"></figure>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <i class="fa fa-line-chart fa-fw"></i> Anomaly Scores
+                    </div>
+                    <!-- /.panel-heading -->
+                    <div class="panel-body">
+                       <figure style="width: 100%; height: 300px;"  id="anomaly-chart"></figure>
+                    </div>
+                </div>
+            </div>
+        </div>
+    %else:
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="panel panel-default">
+                    <div class="panel-body">
+                       <div class="bs-callout bs-callout-danger">
+                          <h4>Nothing to Display!</h4>
+                          There's no flow data for this intersection!
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    %endif
 </div>
 <script type="text/javascript">
+%if has_anything:
 var aData =[
        % for i in scores:
         % if 'anomaly_score' in i:
@@ -108,12 +128,18 @@ var pData = [
     % for i in scores:
         [new Date(Date.UTC(${"{},{},{},{},{}".format(i['datetime'].year, i['datetime'].month-1, i['datetime'].day, i['datetime'].hour, i['datetime'].minute)})),
         %if has_predictions:
-         % if i['readings'][predIdx]['vehicle_count'] < 2040:
-            ${i['readings'][predIdx]['vehicle_count']},
-            ${i['prediction']['prediction']},
-         %endif
+            % if i['readings'][i['prediction']['sensor']] < 2040:
+                ${i['readings'][i['prediction']['sensor']]},
+            %else:
+                null,
+            %endif
+            % if i['prediction']['prediction'] is None:
+                null
+            % else:
+                ${i['prediction']['prediction']}
+            %endif
         %else:
-         ${sum(filter(lambda x: x<2040,pluck(i['readings'],'vehicle_count')))},
+            ${sum(filter(lambda x: x<2040,i['readings'].values()))},
         %endif
         ],
     % endfor
@@ -136,15 +162,18 @@ if (aData.length ==0) {
 </div>').height('0');
 } else {
     var anomalyChart = new Dygraph(document.getElementById('anomaly-chart'), aData, {
-      legend: 'always',
       title: 'Anomaly value for intersection ${intersection['intersection_number']}',
       ylabel: 'Anomaly',
       xlabel: 'Date',
-      labelsUTC: true,
       anomaly: {
             color: "red",
             strokeWidth: 2.0,
         },
+      axes: {
+        y: {
+            valueRange: [0,1.1]
+        }
+      },
       zoomCallback: function(min, max, yRanges) {
           zoomGraph(predictionChart, min, max);
       },
@@ -162,7 +191,6 @@ if (pData.length ==0) {
 </div>').height('0');
 } else {
     var predictionChart = new Dygraph(document.getElementById('prediction-chart'), pData, {
-      legend: 'always',
       %if has_predictions:
           title: 'Prediction and Observation on Sensor: ${scores[0]['prediction']['sensor']}',
           labels: ['UTC','Reading','Prediction'],
@@ -172,9 +200,6 @@ if (pData.length ==0) {
       %endif
       ylabel: 'Volume',
       xlabel: 'Date',
-      labelsUTC: true,
-
-
       zoomCallback: function(min, max, yRanges) {
             zoomGraph(anomalyChart, min, max);
       },
@@ -232,6 +257,7 @@ var opts = {
     $(tt).hide();
   }
 };
+%endif
 $(document).ready(function() {
   var lat = ${intersection['loc']['coordinates'][1]},
       lng = ${intersection['loc']['coordinates'][0]};
@@ -257,7 +283,19 @@ $(document).ready(function() {
          infoWindow:{content: '<a href="/intersection/'+${i['intersection_number']}+'">'+${i['intersection_number']}+'</a>'}
     });
   %endfor
+  function toggleChevron(e) {
+    console.log('chevron clicked');
+    console.log($(e.target));
+      $(e.target)
+        .parent()
+        .find('span.glyphicon')
+        .toggleClass('glyphicon-chevron-down glyphicon-chevron-up');
+  }
+  $('#accordion').on('hidden.bs.collapse', toggleChevron);
+  $('#accordion').on('shown.bs.collapse', toggleChevron);
 });
+
+
 </script>
 
 

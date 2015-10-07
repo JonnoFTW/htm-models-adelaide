@@ -63,11 +63,11 @@ def getSwarmCache(intersection, overwrite=False):
                 for i in readings:
                     # nupic model data format expects this format
                     row = {'timestamp': i['datetime'].strftime('%Y-%m-%d %H:%M')}
-                    for j in i['readings']:
-                        if j['vehicle_count'] > 2040:
-                            row[j['sensor']] = None
+                    for s, c in i['readings'].items():
+                        if c > 2040:
+                            row[s] = None
                         else:
-                            row[j['sensor']] = j['vehicle_count']
+                            row[s] = c
                     writer.writerow(row)
     return "file://"+cache_file
 
@@ -78,7 +78,7 @@ def getSensors(intersection):
         reading = collection.find_one({'site_no': intersection})
         if reading is None:
             raise Exception("No such intersection with site_no '%s' exists" % intersection)
-        return pluck.pluck(reading['readings'], 'sensor')
+        return reading.keys()
 
 
 def getPopularLane(fname):

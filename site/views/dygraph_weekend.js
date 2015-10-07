@@ -1,4 +1,8 @@
- underlayCallback: function(canvas, area, g) {
+drawPoints: true,
+labelsUTC: true,
+legend: 'always',
+pixelsPerLabel: 40,
+underlayCallback: function(canvas, area, g) {
                         var yellow = "rgba(255, 255, 102, 1.0)";
 
                         function highlight_period(x_start, x_end) {
@@ -27,7 +31,7 @@
                             dow = d.getUTCDay();
                         }
                         // shift back 1/2 day to center highlight around the point for the day
-                        w -= 12 * 3600 * 1000;
+                        //w -= 12 * 3600 * 1000;
 
                         canvas.fillStyle = yellow;
                         while (w < max_data_x) {

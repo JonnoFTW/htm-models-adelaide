@@ -1,5 +1,5 @@
 from calendar import monthrange
-from collections import Counter, OrderedDict
+from collections import Counter
 from wsgiref.simple_server import make_server
 import numpy
 from pyramid.config import Configurator
@@ -9,6 +9,7 @@ import pymongo
 import os
 import yaml
 import json
+
 
 from pyramid.events import subscriber
 from pyramid.events import BeforeRender
@@ -152,9 +153,9 @@ def _get_daily_volume(data, hour=None):
     for i in data:
         if hour and i['datetime'].hour != hour:
             continue
-        for j in i['readings']:
-            if j['vehicle_count'] < 2040:
-                counter[i['datetime'].date()] += j['vehicle_count']
+        for s, c in i['readings'].items():
+            if c < 2040:
+                counter[i['datetime'].date()] += c
     return counter
 
 
@@ -248,7 +249,7 @@ def show_report(request):
     data, intersection, start, end = _get_report(args['intersection'], args['report'], start, end)
     if len(data):
         arr = numpy.array([i[1] for i in data])
-        stats = {'std': numpy.std(arr), 'avg': numpy.average(arr)}
+        stats = {'Standard Deviation': numpy.std(arr), 'Average': numpy.average(arr)}
     else:
         stats = "Error"
     return render_to_response(
@@ -325,19 +326,14 @@ def show_intersection(request):
     intersection['neighbours'] = _get_neighbours(site)
 
     anomaly_score = list(get_anomaly_scores(intersection=site))
-    predIdx = -1
-    if len(anomaly_score) > 0:
-        try:
-            intersection['sensors'] = len(anomaly_score[0]['readings'])
-            predIdx = next(index for (index, d) in enumerate(anomaly_score[0]['readings'])
-                     if d["sensor"] == anomaly_score[0]['prediction']['sensor'])
-        except:
-            pass
+    try:
+        intersection['sensors'] = len(anomaly_score[0]['readings'])
+    except:
+        intersection['sensors'] = 'Unknown'
     return render_to_response(
         'views/intersection.mak',
         {'intersection': intersection,
          'scores': anomaly_score,
-         'predIdx': predIdx,
          },
         request=request
     )

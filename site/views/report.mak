@@ -139,7 +139,6 @@ if (data.length ==0) {
 </div>').height('0');
 } else {
     var chart = new Dygraph(document.getElementById('chart'), data, {
-      legend: 'always',
       title: '${report_title} for ${start_title} - ${end_title}',
       ylabel: 'Volume',
           %if is_rank:
@@ -147,8 +146,6 @@ if (data.length ==0) {
         %else:
          xlabel: 'Date',
         %endif
-      labelsUTC: true,
-      drawPoints: true,
       volume: {
             color: "red",
             strokeWidth: 2.0,
