@@ -300,7 +300,8 @@ def run_single_intersection(args):
             if write_anomaly:
                 write_anomaly_out(i, anomaly_score, pfield, prediction, collection)
     print("Intersection %s: --- %s seconds ---" % (intersection, time.time() - start_time))
-    return model
+    # return model # doesn't work at the moment
+    return None
 
 
 def run_all(locations, write_anomaly, key='intersection_number'):
