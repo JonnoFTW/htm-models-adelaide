@@ -1,5 +1,6 @@
 #!/usr/bin/env python2.7
 from collections import Counter
+from datetime import timedelta
 from multiprocessing import Pool
 import sys
 import argparse
@@ -112,6 +113,19 @@ def createModel(modelParams, intersection):
                     'type': 'ScalarEncoder',
                     'w': 21
                 }
+            modelParams['modelParams']['sensorParams']['encoders']['timestamp_dayOfWeek'] = {'fieldname': 'timestamp',
+                                                                                  'name': 'timestamp_dayOfWeek',
+                                                                                  'type': 'DateEncoder',
+                                                                                  'dayOfWeek': (21, 1)}
+            modelParams['modelParams']['sensorParams']['encoders']['timestamp_timeOfDay'] = {
+                                                                                  'fieldname': 'timestamp',
+                                                                                  'name': 'timestamp_timeOfDay',
+                                                                                  'type': 'DateEncoder',
+                                                                                  'timeOfDay': (21, 6)}
+            modelParams['modelParams']['sensorParams']['encoders']['timestamp_weekend'] = {'fieldname': 'timestamp',
+                                                                                  'name': 'timestamp_weekend',
+                                                                                  'type': 'DateEncoder',
+                                                                                  'weekend': (21, 1)}
 
         print "Creating model for %s..." % intersection
         model = ModelFactory.create(modelParams)
@@ -235,11 +249,16 @@ def runIoThroughNupic(readings, model, intersection, output, write_anomaly, coll
 
 def write_anomaly_out(doc, anomalyScore, pfield, prediction, collection):
     collection.update_one({"_id": doc["_id"]},
-                          {"$set": {"anomaly_score": anomalyScore,
-                                    "prediction": {
-                                        'sensor': pfield,
-                                        'prediction': prediction
-                                    }}})
+                          {"$set": {"anomaly_score": anomalyScore}})
+    next_doc = collection.find_one({'site_no': doc['site_no'],
+                                   'datetime': doc['datetime'] + timedelta(minutes=5)})
+    if next_doc is not None:
+        collection.update_one({'_id': next_doc['_id']},
+                              {"$set": {"prediction": {
+                                'sensor': pfield,
+                                'prediction': prediction,
+                                'error': abs(next_doc['readings'][pfield] - prediction)
+                              }}})
 
 
 def save_model(model):
@@ -286,9 +305,10 @@ def run_single_intersection(args):
 def run_all(locations, write_anomaly, key='intersection_number'):
     modelParams = getModelParamsFromName('3001', False)
     pool = Pool(processes=8)
-    models = pool.map(run_single_intersection,
+    pool.map(run_single_intersection,
                    [(i[key], modelParams, write_anomaly) for i in locations])
-    map(save_model, models)
+    # saving doesn't work here
+    #map(save_model, models)
 
 
 
@@ -311,7 +331,8 @@ def runModel(intersection, output, swarm, write_anomaly):
         except KeyboardInterrupt:
             pass
         finally:
-            save_model(model)
+            pass
+            #save_model(model)
 
 
 def runAllModels(write_anomaly, incomplete):

@@ -72,7 +72,7 @@ def _get_neighbours(intersection):
     :return:
     """
     center = _get_intersection(intersection)
-    if 'neighbours' not in center or len(center['neighbours']) == 0:
+    if not center or 'neighbours' not in center or len(center['neighbours']) == 0:
         return []
     with _get_mongo_client() as client:
         coll = client[mongo_database]['locations']
@@ -323,6 +323,10 @@ def show_intersection(request):
     # show specific intersection if it exists
     site = args['site_no']
     intersection = _get_intersection(site)
+    if intersection is None:
+        return render_to_response('views/intersection.mak',
+                                  {'intersection':intersection},
+                                  request)
     intersection['neighbours'] = _get_neighbours(site)
 
     anomaly_score = list(get_anomaly_scores(intersection=site))
