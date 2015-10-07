@@ -31,6 +31,7 @@ try:
         mongo_uri = conf['mongo_uri']
         mongo_database = conf['mongo_database']
         mongo_collection = conf['mongo_collection']
+        POOL_SIZE = conf['pool_size']
 except:
     raise Exception('No connection.yaml with mongo_uri defined! please make one with a mongo_uri variable')
 
@@ -304,7 +305,7 @@ def run_single_intersection(args):
 
 def run_all(locations, write_anomaly, key='intersection_number'):
     modelParams = getModelParamsFromName('3001', False)
-    pool = Pool(processes=8)
+    pool = Pool(processes=POOL_SIZE)
     pool.map(run_single_intersection,
                    [(i[key], modelParams, write_anomaly) for i in locations])
     # saving doesn't work here
