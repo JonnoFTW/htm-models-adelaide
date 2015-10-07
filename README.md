@@ -56,20 +56,25 @@ of Adelaide. The data is stored in *mongodb* in the following format:
 
 ````
 {
-    "readings" : [ 
-        {"vehicle_count" : 60, "sensor" : "8"}, 
-        { "vehicle_count" : 32,"sensor" : "16"}, 
-        {"vehicle_count" : 37,"sensor" : "24"}, 
-        {"vehicle_count" : 25,"sensor" : "32" }, 
-        {"vehicle_count" : 11,"sensor" : "40"}, 
-        { "vehicle_count" : 7,"sensor" : "48"}, 
-        {"vehicle_count" : 8,"sensor" : "56"}, 
-        {"vehicle_count" : 6,"sensor" : "64"}
-    ],
+    "readings" : { 
+        "8": 60, 
+        "16": 32, 
+        "24": 37, 
+        "32": 25 , 
+        "40": 11, 
+        "48": 7, 
+        "56": 8, 
+         "64": 6,
+    },
     "site_no" : "46",
     "datetime" : ISODate("2010-01-29T09:15:00.000Z")
 }
 ````
+
+The readings are a dict that maps the sensor's ID to the vehicle count at that time. Sometimes, these sensors output
+an error value of 2046 or 2047 indicating physical damage or detector error respectively. In the application, these 
+values are ignored and passed to the models as null values. Future work will seek to fill in these error gaps using 
+some form of prediction.
 
 Usage
 -----
