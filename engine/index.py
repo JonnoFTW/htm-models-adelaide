@@ -75,7 +75,7 @@ def createModel(modelParams, intersection):
     modelDir = getModelDir(intersection)
     if False and os.path.isdir(modelDir):
         # Read in the cached model
-        print "Loading cached model for %s from %s..." % (intersection, modelDir)
+        print "Loading cached model for {} from {}...".format(intersection, modelDir)
         return ModelFactory.loadFromCheckpoint(modelDir)
     else:
         # redo the modelParams to use the actual sensor names
@@ -109,7 +109,7 @@ def createModel(modelParams, intersection):
                     'fieldname': k,
                     'maxval': 200,
                     'minval': 0,
-                    'n': 22,
+                    'n': 100,
                     'name': k,
                     'type': 'ScalarEncoder',
                     'w': 21
@@ -128,7 +128,7 @@ def createModel(modelParams, intersection):
                                                                                   'type': 'DateEncoder',
                                                                                   'weekend': (21, 1)}
 
-        print "Creating model for %s..." % intersection
+        print "Creating model for {}...".format(intersection)
         model = ModelFactory.create(modelParams)
         model.site_no = intersection
         model.encoders = modelParams['modelParams']['sensorParams']['encoders'].keys()
@@ -273,15 +273,16 @@ def save_model(model):
 
 def run_single_intersection(args):
     intersection, modelParams, write_anomaly = args[0], args[1], args[2]
+    print "Running intersection", intersection
     start_time = time.time()
+    model = createModel(modelParams, intersection)
+    if model is None:
+        return
     with pymongo.MongoClient(mongo_uri) as client:
         collection = client[mongo_database][mongo_collection]
-        readings = collection.find({'site_no': intersection}).sort('datetime', pymongo.ASCENDING)
-        model = createModel(modelParams, intersection)
-        if model is None:
-            return None
+        readings = collection.find({'site_no': intersection}).sort('datetime', pymongo.ASCENDING).limit(500)
+
         pfield = model.getInferenceArgs()['predictedField']
-        encoders = modelParams
         for i in readings:
             timestamp = i['datetime']
             fields = {
@@ -300,17 +301,13 @@ def run_single_intersection(args):
             if write_anomaly:
                 write_anomaly_out(i, anomaly_score, pfield, prediction, collection)
     print("Intersection %s: --- %s seconds ---" % (intersection, time.time() - start_time))
-    # return model # doesn't work at the moment
-    return None
+    #save_model(model)
 
 
 def run_all(locations, write_anomaly, key='intersection_number'):
-    modelParams = getModelParamsFromName('3001', False)
+    model_params = getModelParamsFromName('3001', False)
     pool = Pool(processes=POOL_SIZE)
-    pool.map(run_single_intersection,
-                   [(i[key], modelParams, write_anomaly) for i in locations])
-    # saving doesn't work here
-    #map(save_model, models)
+    pool.map(run_single_intersection, ((i[key], model_params, write_anomaly) for i in locations))
 
 
 
@@ -333,8 +330,7 @@ def runModel(intersection, output, swarm, write_anomaly):
         except KeyboardInterrupt:
             pass
         finally:
-            pass
-            #save_model(model)
+            save_model(model)
 
 
 def runAllModels(write_anomaly, incomplete):
