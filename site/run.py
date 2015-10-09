@@ -1,3 +1,4 @@
+#!/usr/bin/env python2.7
 from calendar import monthrange
 from collections import Counter
 from wsgiref.simple_server import make_server
@@ -33,6 +34,7 @@ try:
         mongo_database = conf['mongo_database']
         mongo_collection = conf['mongo_collection']
         gmaps_key = conf['GMAPS_API_KEY']
+        max_vehicles = conf['max_vehicles']
 
 except:
     raise Exception('No connection.yaml with mongo_uri defined! please make one with a mongo_uri variable')
@@ -43,6 +45,7 @@ def add_global(event):
     event['GMAPS_API_KEY'] = gmaps_key
     event['date_format'] = '%Y-%m-%d %H:%M'
     event['reports'] = REPORTS
+    event['max_vehicles'] = max_vehicles
 
 
 def _get_mongo_client():
@@ -108,7 +111,7 @@ def get_accident_near(time, intersection):
             'loc': {
                 '$geoNear': {
                    '$geometry': location['loc'],
-                    '$maxDistance': 200
+                    '$maxDistance': max_vehicles
                 }
             },
             'datetime': {
@@ -154,7 +157,7 @@ def _get_daily_volume(data, hour=None):
         if hour and i['datetime'].hour != hour:
             continue
         for s, c in i['readings'].items():
-            if c < 2040:
+            if c < max_vehicles:
                 counter[i['datetime'].date()] += c
     return counter
 
@@ -325,13 +328,13 @@ def show_intersection(request):
     intersection = _get_intersection(site)
     if intersection is None:
         return render_to_response('views/intersection.mak',
-                                  {'intersection':intersection},
+                                  {'intersection': intersection},
                                   request)
     intersection['neighbours'] = _get_neighbours(site)
 
     anomaly_score = list(get_anomaly_scores(intersection=site))
     try:
-        intersection['sensors'] = len(anomaly_score[0]['readings'])
+        intersection['sensors'] = sorted(map(int, intersection['sensors']))
     except:
         intersection['sensors'] = 'Unknown'
     return render_to_response(

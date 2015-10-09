@@ -77,7 +77,7 @@
                     <i class="fa fa-map fa-fw"></i> Map
                 </div>
                 <div class="panel-body">
-                    <div style="height:200px" id="map"></div>
+                    <div style="height:300px" id="map"></div>
                 </div>
                 <!-- /.panel-body -->
             </div>
@@ -145,7 +145,7 @@ var pData = [
     % for i in scores:
         [new Date(Date.UTC(${"{},{},{},{},{}".format(i['datetime'].year, i['datetime'].month-1, i['datetime'].day, i['datetime'].hour, i['datetime'].minute)})),
         %if has_predictions:
-            % if i['readings'][i['prediction']['sensor']] < 2040:
+            % if i['readings'][i['prediction']['sensor']] < max_vehicles:
                 ${i['readings'][i['prediction']['sensor']]},
             %else:
                 null,
@@ -156,7 +156,7 @@ var pData = [
                 ${i['prediction']['prediction']}
             %endif
         %else:
-            ${sum(filter(lambda x: x<2040,i['readings'].values()))},
+            ${sum(filter(lambda x: x< max_vehicles,i['readings'].values()))},
         %endif
         ],
     % endfor

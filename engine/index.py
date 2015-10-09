@@ -13,6 +13,7 @@ from nupic.frameworks.opf.modelfactory import ModelFactory
 import pyprind
 
 import yaml
+global CACHE_MODELS
 
 
 def getEngineDir():
@@ -30,6 +31,7 @@ try:
         MODEL_PARAMS_DIR = conf['MODEL_PARAMS_DIR']
         MODEL_CACHE_DIR = conf['MODEL_CACHE_DIR']
         SWARM_CONFIGS_DIR = conf['SWARM_CONFIGS_DIR']
+        max_vehicles = conf['max_vehicles']
 except:
     raise Exception('No connection.yaml with mongo_uri defined! please make one with a mongo_uri variable')
 
@@ -59,7 +61,7 @@ def get_most_used_sensors(intersection):
         counter = Counter()
         for i in records:
             for s, c in i['readings'].items():
-                if c < 2040:
+                if c < max_vehicles:
                     counter[s] += c
         return counter
 
@@ -101,9 +103,9 @@ def createModel(intersection):
                 modelParams['modelParams']['sensorParams']['encoders'][k] = {
                     'clipInput': True,
                     'fieldname': k,
-                    'maxval': 200,
+                    'maxval': max_vehicles,
                     'minval': 0,
-                    'n': 100,
+                    'n': 1050,
                     'name': k,
                     'type': 'ScalarEncoder',
                     'w': 21
@@ -129,12 +131,25 @@ def createModel(intersection):
         return model
 
 
+def setup_location_sensors():
+    with pymongo.MongoClient(mongo_uri) as client:
+        locations = client[mongo_database]['locations']
+        for i in locations.find():
+            counts = get_most_used_sensors(i['intersection_number']).items()
+            if len(counts) == 0:
+                continue
+            locations.update_one({'_id': i['_id']},
+                                 {'$set': {'sensors':
+                                               [i[0] for i in counts if i[1] != 0]
+                                          }})
+
+
 def getMax():
     with pymongo.MongoClient(mongo_uri) as client:
         collection = client[mongo_database][mongo_collection]
         readings = collection.find()
         print "Max vehicle count:", max([max(
-            filter(lambda x: x < 2040, i.values())) for i in readings])
+            filter(lambda x: x < max_vehicles, i.values())) for i in readings])
 
 def getModelParamsFromName(intersection):
     """
@@ -158,6 +173,9 @@ def get_encoders(model):
 
 def runIoThroughNupic(readings, intersection, write_anomaly, collection, progress=True):
     model = createModel(intersection)
+    if model is None:
+        print "No model could be made for intersection", intersection
+        return
     pfield = model.getInferenceArgs()['predictedField']
     counter = 0
     total = readings.count(True)
@@ -176,7 +194,7 @@ def runIoThroughNupic(readings, intersection, write_anomaly, collection, progres
             if j[0] not in encoders:
                 continue
             vc = j[1]
-            if vc > 2040:
+            if vc > max_vehicles:
                 vc = None
             fields[j[0]] = vc
         result = model.run(fields)
@@ -201,13 +219,15 @@ def write_anomaly_out(doc, anomalyScore, pfield, prediction, collection):
                               {"$set": {"prediction": {
                                 'sensor': pfield,
                                 'prediction': prediction,
-                                'error': abs(next_doc['readings'][pfield] - prediction)
+                               # 'error': abs(next_doc['readings'][pfield] - prediction)
                               }}})
 
 
 def save_model(model, site_no):
+    if not CACHE_MODELS:
+        return
     if model is None:
-        print "Not saving model"
+        print "Not saving model for", site_no
         return
     out_dir = getModelDir(site_no)
     print "Caching model to", out_dir, "on pid", os.getpid(), "id", id(model)
@@ -265,7 +285,13 @@ if __name__ == "__main__":
     parser.add_argument('--intersection', type=str, help="Name of the intersection", default='')
     parser.add_argument('--incomplete', help="Analyse those intersections not done yet", action='store_true')
     parser.add_argument('--popular', help="Show the most popular sensor for an intersection", action='store_true')
+    parser.add_argument('--cache-models', help="Cache models", action='store_true')
+    parser.add_argument('--setup-sensors', help='store used sensors in locations', action='store_true')
     args = parser.parse_args()
+    if args.setup_sensors:
+        setup_location_sensors()
+        sys.exit()
+    CACHE_MODELS = args.cache_models
     setupFolders()
     if args.all:
         run_all_intersections(args.write_anomaly, args.incomplete, args.intersection)
