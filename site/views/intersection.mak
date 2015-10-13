@@ -1,3 +1,7 @@
+<%
+from bson import json_util
+import json
+%>
 <%include file="header.html"/>
 %if intersection is None:
 <div class="container">
@@ -23,6 +27,7 @@
 %>
 
 <script type="text/javascript" src="//cdn.jsdelivr.net/bootstrap.daterangepicker/2/daterangepicker.js"></script>
+<script type="text/javascript" src="/assets/fontawesome-markers.min.js"></script>
 <div class="container">
   <h1>Intersection: ${intersection['intersection_number']}</h1>
     <div class="row">
@@ -85,7 +90,6 @@
         </div>
     </div>
     % if has_anything:
-
         <div class="row">
             <div class="col-lg-12">
                 <div class="panel panel-default">
@@ -130,6 +134,53 @@
             </div>
         </div>
     %endif
+    <div class="row">
+        <div class="col-lg-6">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <i class="fa fa-line-chart fa-fw"></i> Incidents
+                </div>
+                <!-- /.panel-heading -->
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                        <th>Time</th>
+                        <th>Error</th>
+                        <th>Vehicles</th>
+                        <th>Weather</th>
+                        <th>Crash Type</th>
+                        <th>Involves 4WD</th>
+                        <th>Total Damage</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        % for i in incidents:
+                        <tr>
+                            <td>${i['datetime']}</td>
+                            <td>${i['App_Error']}</td>
+                            <td>${i['Total_Vehicles_Involved']}</td>
+                            <td>${i['Weather_Cond']} - ${i['Moisture_Cond']}</td>
+                            <td>${i['Crash_Type']}</td>
+                            <td>${i['Involves_4WD']}</td>
+                            <td>${i['Total_Damage']}</td>
+                        </tr>
+                        % endfor
+                    </tbody>
+                </table>
+            </div>
+        </div>
+         <div class="col-lg-6">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <i class="fa fa-map fa-fw"></i> Nearby Accidents
+                </div>
+                <div class="panel-body">
+                    <div style="height:600px" id="map-incident"></div>
+                </div>
+                <!-- /.panel-body -->
+            </div>
+        </div>
+    </div>
 </div>
 <script type="text/javascript">
 var None = null;
@@ -140,10 +191,15 @@ var aData =[
           [new Date(Date.UTC(${"{},{},{},{},{}".format(i['datetime'].year, i['datetime'].month-1, i['datetime'].day, i['datetime'].hour, i['datetime'].minute)})),
            ${i['anomaly']['score']},
            % if 'likelihood' in i['anomaly']:
-              ${i['anomaly']['likelihood']}
+              ${i['anomaly']['likelihood']},
            %else:
-               null
+               null,
            %endif
+           % if len([x for x in incidents if x['datetime'] == i['datetime']]) != 0:
+            1.1
+           %else:
+            null,
+            %endif
             ],
         % endif
        % endfor
@@ -196,9 +252,14 @@ if (aData.length ==0) {
             color: "red",
             strokeWidth: 2.0,
         },
+      incident: {
+            color: "green",
+            strokeWidth: 0.0,
+            pointSize: 4,
+      },
       axes: {
         y: {
-            valueRange: [0,1.1]
+            valueRange: [0,1.2]
         }
       },
       zoomCallback: function(min, max, yRanges) {
@@ -207,7 +268,7 @@ if (aData.length ==0) {
       highlightCallback: function(event, x, point, row, seriesName) {
           highlightX(predictionChart, row);
       },
-      labels: ['UTC', 'anomaly', 'likelihood'],
+      labels: ['UTC', 'anomaly', 'likelihood', 'incident'],
        <%include file="dygraph_weekend.js"/>
     });
 }
@@ -296,12 +357,13 @@ $(document).ready(function() {
     div: '#map',
     zoom: 15
   });
-
-  map.addMarker({
+   var mainMarker = {
     lat: lat,
     lng: lng,
     title: '${intersection['intersection_number']}'
-  });
+  };
+  map.addMarker(mainMarker);
+
   %for i in intersection['neighbours']:
     map.addMarker({
          lat: ${i['loc']['coordinates'][1]},
@@ -310,6 +372,46 @@ $(document).ready(function() {
          infoWindow:{content: '<a href="/intersection/'+${i['intersection_number']}+'">'+${i['intersection_number']}+'</a>'}
     });
   %endfor
+  var mapCrash = new GMaps({
+    lat: lat,
+    lng: lng,
+    div: '#map-incident',
+    zoom: 15
+  });
+  var incidents = [
+  %for i in incidents:
+    ${json.dumps(i,default=json_util.default)|n},
+  %endfor
+  ];
+  mapCrash.addMarker(mainMarker);
+  mapCrash.drawCircle({lat:lat,lng:lng,radius:100,
+        editable: false,
+        fillColor: '#004de8',
+        fillOpacity: 0.27,
+        strokeColor: '#004de8',
+        strokeOpacity: 0.62,
+        strokeWeight: 1
+  });
+  $.each(incidents, function(){
+
+      console.log(this);
+      var windowStr = 'Yep';
+      mapCrash.addMarker({
+        lat: this.loc['coordinates'][1],
+        lng: this.loc['coordinates'][0],
+        infoWindow: windowStr,
+        icon: {
+            path: fontawesome.markers.EXCLAMATION_CIRCLE,
+            scale: 0.5,
+            strokeWeight: 0.2,
+            strokeColor: 'black',
+            strokeOpacity: 1,
+            fillColor: '#B71C1C',
+            fillOpacity: 1,
+           },
+
+      });
+  });
   function toggleChevron(e) {
     console.log('chevron clicked');
     console.log($(e.target));

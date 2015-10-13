@@ -8,6 +8,7 @@ from pyramid.renderers import render_to_response
 from datetime import datetime, timedelta, date
 import pymongo
 import os
+from pyramid.view import view_config
 import yaml
 import json
 
@@ -92,7 +93,7 @@ def _get_intersections():
         return coll.find({'intersection_number': {'$exists': True}}, {'_id': False})
 
 
-def get_accident_near(time, intersection):
+def get_accident_near(time_start, time_end, intersection):
     """
     Return any accidents at this time,
     should probably be listed in the app
@@ -105,20 +106,20 @@ def get_accident_near(time, intersection):
         crashes = db['crashes']
         locations = db['locations']
         location = locations.find_one({'intersection_number': intersection})
-        timestamp = datetime.utcfromtimestamp(time)
-        delta = timedelta(minutes=30)
-        return crashes.find({
+        # timestamp = datetime.utcfromtimestamp(float(time))
+        # delta = timedelta(minutes=30)
+        return list(crashes.find({
             'loc': {
                 '$geoNear': {
                    '$geometry': location['loc'],
-                    '$maxDistance': max_vehicles
+                    '$maxDistance': 100
                 }
             },
             'datetime': {
-                '$gte': timestamp - delta,
-                '$lte': timestamp + delta
+                '$gte': time_start, #timestamp - delta,
+                '$lte': time_end #timestamp + delta
             }
-        })
+        }))
 
 
 def get_anomaly_scores(from_date=None, to_date=None, intersection='3001', anomaly_threshold=None):
@@ -333,6 +334,8 @@ def show_intersection(request):
     intersection['neighbours'] = _get_neighbours(site)
 
     anomaly_score = list(get_anomaly_scores(intersection=site))
+    time_start = anomaly_score[0]['datetime']
+    time_end = anomaly_score[-1]['datetime']
     try:
         intersection['sensors'] = sorted(map(int, intersection['sensors']))
     except:
@@ -341,6 +344,7 @@ def show_intersection(request):
         'views/intersection.mak',
         {'intersection': intersection,
          'scores': anomaly_score,
+         'incidents': get_accident_near(time_start, time_end, intersection['intersection_number'])
          },
         request=request
     )
@@ -359,6 +363,8 @@ if __name__ == '__main__':
     config.add_view(show_intersection, route_name='intersection')
     config.add_route('intersections', '/intersections')
     config.add_route('reports', '/reports/{intersection}/{report}')
+    config.add_route('accidents', '/accidents/{intersection}/{time}')
+    config.add_view(get_accident_near, route_name='accidents', renderer='json')
     config.add_view(show_report, route_name='reports')
     config.add_view(list_intersections, route_name='intersections')
     config.add_static_view(name='assets', path='assets')

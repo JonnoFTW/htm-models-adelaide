@@ -100,7 +100,7 @@ def createModel(intersection):
                 # don't model unused sensors
                 # could run into errors when the sensor
                 # was damaged for more than the sample period though
-                if sensor_counts[k] == 0:
+                if sensor_counts[k] == 0 or k != pField:
                     continue
                 modelParams['modelParams']['sensorParams']['encoders'][k] = {
                    # 'clipInput': True,
