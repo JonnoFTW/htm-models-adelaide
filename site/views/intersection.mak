@@ -1,6 +1,7 @@
 <%
 from bson import json_util
 import json
+pfield = intersection['sensors'][0]
 %>
 <%include file="header.html"/>
 %if intersection is None:
@@ -189,12 +190,8 @@ var aData =[
        % for i in scores:
         % if 'anomaly' in i:
           [new Date(Date.UTC(${"{},{},{},{},{}".format(i['datetime'].year, i['datetime'].month-1, i['datetime'].day, i['datetime'].hour, i['datetime'].minute)})),
-           ${i['anomaly']['score']},
-           % if 'likelihood' in i['anomaly']:
-              ${i['anomaly']['likelihood']},
-           %else:
-               null,
-           %endif
+           ${i['anomaly'][pfield]['score']},
+           ${i['anomaly'][pfield]['likelihood']},
            % if len([x for x in incidents if x['datetime'] == i['datetime']]) != 0:
             1.1
            %else:
@@ -209,12 +206,12 @@ var pData = [
     % for i in scores:
         [new Date(Date.UTC(${"{},{},{},{},{}".format(i['datetime'].year, i['datetime'].month-1, i['datetime'].day, i['datetime'].hour, i['datetime'].minute)})),
         %if has_predictions:
-            % if i['readings'][i['prediction']['sensor']] < max_vehicles:
-                ${i['readings'][i['prediction']['sensor']]},
+            % if i['readings'][pfield] < max_vehicles:
+               ${i['readings'][pfield]},
             %else:
                 null,
             %endif
-            ${i['prediction']['prediction']}
+            ${i['prediction'][pfield]['prediction']}
         %else:
             ${sum(filter(lambda x: x< max_vehicles,i['readings'].values()))},
         %endif
@@ -280,7 +277,7 @@ if (pData.length ==0) {
 } else {
     var predictionChart = new Dygraph(document.getElementById('prediction-chart'), pData, {
       %if has_predictions:
-          title: 'Prediction and Observation on Sensor: ${scores[0]['prediction']['sensor']}',
+          title: 'Prediction and Observation on Sensor: ${intersection['sensors'][0]}',
           labels: ['UTC','Reading','Prediction'],
       %else:
         title: 'Total Traffic Flow for intersection ${intersection['intersection_number']}',

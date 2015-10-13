@@ -67,6 +67,34 @@ def get_most_used_sensors(intersection):
         return counter
 
 
+def get_sensor_encoder(name):
+    return {'fieldname': name,
+            'resolution': 10,
+            'n': 400,
+            'name': name,
+            'type': 'RandomDistributedScalarEncoder',
+            'w': 21
+    }
+
+
+def get_time_encoders():
+    return [{
+      'fieldname': 'timestamp',
+      'name': 'timestamp_timeOfDay',
+      'type': 'DateEncoder',
+      'timeOfDay': (21, 6)},
+    {
+      'fieldname': 'timestamp',
+      'name': 'timestamp_weekend',
+      'type': 'DateEncoder',
+      'weekend': (21, 1)}
+       # {'fieldname': 'timestamp',
+       # 'name': 'timestamp_dayOfWeek',
+       # 'type': 'DateEncoder',
+       # 'dayOfWeek': (21, 1)}
+    ]
+
+
 def createModel(intersection):
     modelDir = getModelDir(intersection)
     if CACHE_MODELS and os.path.isdir(modelDir):
@@ -77,7 +105,7 @@ def createModel(intersection):
         start = time.time()
         # redo the modelParams to use the actual sensor names
         modelParams = getModelParamsFromName('3001')
-        modelParams['modelParams']['sensorParams']['encoders'].clear()
+
         sensor_counts = get_most_used_sensors(intersection)
         # try:
         #     pField = getSwarmConfig(intersection)['inferenceArgs']['predictedField']
@@ -102,28 +130,10 @@ def createModel(intersection):
                 # was damaged for more than the sample period though
                 if sensor_counts[k] == 0 or k != pField:
                     continue
-                modelParams['modelParams']['sensorParams']['encoders'][k] = {
-                   # 'clipInput': True,
-                    'fieldname': k,
-                    'resolution': 10,
-                    'n': 400,
-                    'name': k,
-                    'type': 'RandomDistributedScalarEncoder',
-                    'w': 21
-                }
-            # modelParams['modelParams']['sensorParams']['encoders']['timestamp_dayOfWeek'] = {'fieldname': 'timestamp',
-            #                                                                       'name': 'timestamp_dayOfWeek',
-            #                                                                       'type': 'DateEncoder',
-            #                                                                       'dayOfWeek': (21, 1)}
-            modelParams['modelParams']['sensorParams']['encoders']['timestamp_timeOfDay'] = {
-                                                                                  'fieldname': 'timestamp',
-                                                                                  'name': 'timestamp_timeOfDay',
-                                                                                  'type': 'DateEncoder',
-                                                                                  'timeOfDay': (21, 6)}
-            modelParams['modelParams']['sensorParams']['encoders']['timestamp_weekend'] = {'fieldname': 'timestamp',
-                                                                                  'name': 'timestamp_weekend',
-                                                                                  'type': 'DateEncoder',
-                                                                                  'weekend': (21, 1)}
+                modelParams['modelParams']['sensorParams']['encoders'][k] = get_sensor_encoder(k)
+
+            for i in get_time_encoders():
+                modelParams['modelParams']['sensorParams']['encoders'][i['name']] = i
 
 
         model = ModelFactory.create(modelParams)
@@ -131,6 +141,17 @@ def createModel(intersection):
         print "Creating model for {}, in {}s".format(intersection, time.time() - start)
         return model
 
+
+def create_single_sensor_model(sensor, intersection):
+    start = time.time()
+    model_params = getModelParamsFromName('3001')
+    model_params['modelParams']['sensorParams']['encoders'][sensor] = get_sensor_encoder(sensor)
+    for i in get_time_encoders():
+        model_params['modelParams']['sensorParams']['encoders'][i['name']] = i
+    model = ModelFactory.create(model_params)
+    model.enableInference({'predictedField': sensor})
+    print "Creating model for {}:{} in {}s".format(intersection, sensor, time.time() - start)
+    return model
 
 def setup_location_sensors():
     with pymongo.MongoClient(mongo_uri) as client:
@@ -165,6 +186,7 @@ def getModelParamsFromName(intersection):
         importedModelParams = importlib.import_module(importName).MODEL_PARAMS
     except ImportError:
        raise sys.exit("No model params exist for '%s'. Run swarm first!" % intersection)
+    importedModelParams['modelParams']['sensorParams']['encoders'].clear()
     return importedModelParams
 
 
@@ -172,60 +194,74 @@ def get_encoders(model):
     return set([i.name for i in model._getSensorRegion().getSelf().encoder.getEncoderList()])
 
 
-def runIoThroughNupic(readings, intersection, write_anomaly, collection, progress=True):
-    model = createModel(intersection)
-    anomaly_likelihood_helper = anomaly_likelihood.AnomalyLikelihood(600, 200)
-    if model is None:
-        print "No model could be made for intersection", intersection
-        return
-    pfield = model.getInferenceArgs()['predictedField']
+def process_readings(readings, intersection, write_anomaly, collection, progress=True, multi_model=False):
     counter = 0
     total = readings.count(True)
-    encoders = get_encoders(model)
+    anomaly_likelihood_helper = anomaly_likelihood.AnomalyLikelihood(600, 200)
+    if multi_model:
+        with pymongo.MongoClient(mongo_uri) as client:
+            loc = client[mongo_database]['locations'].find_one({'intersection_number': intersection})
+        models = {sensor: create_single_sensor_model(sensor, intersection) for sensor in loc['sensors']}
+    else:
+        model = createModel(intersection)
+        if model is None:
+            print "No model could be made for intersection", intersection
+            return
+        pfield = model.getInferenceArgs()['predictedField']
+        encoders = get_encoders(model)
     if progress:
         progBar = pyprind.ProgBar(total, width=50)
+
     for i in readings:
         counter += 1
         if progress:
             progBar.update()
         timestamp = i['datetime']
-        fields = {
-            "timestamp": timestamp
-        }
-        for p, j in enumerate(i['readings'].items()):
-            if j[0] not in encoders:
-                continue
-            vc = j[1]
-            if vc > max_vehicles:
-                vc = None
-            fields[j[0]] = vc
-        result = model.run(fields)
 
-        prediction = result.inferences["multiStepBestPredictions"][1]
-        anomaly_score = result.inferences["anomalyScore"]
-        likelihood = anomaly_likelihood_helper.anomalyProbability(
-            i['readings'][pfield], anomaly_score, timestamp)
-        #likelihood = anomaly_likelihood_helper.computeLogLikelihood(likelihood)
+        if multi_model:
+            predictions, anomalies = {}, {}
+            # each sensor should probably be in its own process...
+            for sensor, model in models.items():
+                fields = {"timestamp": timestamp, sensor: i['readings'][sensor]}
+                result = model.run(fields)
+                prediction = result.inferences["multiStepBestPredictions"][1]
+                anomaly_score = result.inferences["anomalyScore"]
+                likelihood = anomaly_likelihood_helper.anomalyProbability(
+                    i['readings'][sensor], anomaly_score, timestamp)
+                predictions[sensor] = prediction
+                anomalies[sensor] = {'score': anomaly_score, 'likelihood': likelihood}
+        else:
+            fields = {"timestamp": timestamp}
+            for p, j in enumerate(i['readings'].items()):
+                if j[0] not in encoders:
+                    continue
+                vc = j[1]
+                if vc > max_vehicles:
+                    vc = None
+                fields[j[0]] = vc
+            result = model.run(fields)
+            prediction = result.inferences["multiStepBestPredictions"][1]
+            anomaly_score = result.inferences["anomalyScore"]
+            predictions = {pfield: prediction}
+            likelihood = anomaly_likelihood_helper.anomalyProbability(
+                i['readings'][pfield], anomaly_score, timestamp)
+            anomalies = {pfield: {'score': anomaly_score, 'likelihood': likelihood}}
         if write_anomaly:
-            write_anomaly_out(i, anomaly_score, likelihood, pfield, prediction, collection)
+            write_anomaly_out(i, anomalies, predictions, collection)
     if progress:
         print
     print "Read", counter, "lines"
     save_model(model, intersection)
 
 
-def write_anomaly_out(doc, anomaly_score, likelihood, pfield, prediction, collection):
+def write_anomaly_out(doc, anomalies, predictions, collection):
     collection.update_one({"_id": doc["_id"]},
-                          {"$set": {"anomaly": {"score":anomaly_score,"likelihood": likelihood}}})
+                          {"$set": {"anomalies": anomalies}})
     next_doc = collection.find_one({'site_no': doc['site_no'],
                                    'datetime': doc['datetime'] + timedelta(minutes=5)})
     if next_doc is not None:
         collection.update_one({'_id': next_doc['_id']},
-                              {"$set": {"prediction": {
-                                'sensor': pfield,
-                                'prediction': prediction,
-                               # 'error': abs(next_doc['readings'][pfield] - prediction)
-                              }}})
+                              {"$set": {"predictions": predictions}})
 
 
 def save_model(model, site_no):
@@ -241,7 +277,7 @@ def save_model(model, site_no):
 
 
 def run_single_intersection(args):
-    intersection, write_anomaly, incomplete, show_progress = args[0], args[1], args[2], args[3]
+    intersection, write_anomaly, incomplete, show_progress, multi_model = args[0], args[1], args[2], args[3], args[4]
     start_time = time.time()
 
     with pymongo.MongoClient(mongo_uri) as client:
@@ -253,7 +289,7 @@ def run_single_intersection(args):
         if readings.count(True) == 0:
             print "No readings for intersection {}".format(intersection)
             return
-        runIoThroughNupic(readings, intersection, write_anomaly, collection, show_progress)
+        process_readings(readings, intersection, write_anomaly, collection, show_progress, multi_model)
 
     print("Intersection %s complete: --- %s seconds ---" % (intersection, time.time() - start_time))
 
@@ -293,6 +329,7 @@ if __name__ == "__main__":
     parser.add_argument('--popular', help="Show the most popular sensor for an intersection", action='store_true')
     parser.add_argument('--cache-models', help="Cache models", action='store_true')
     parser.add_argument('--setup-sensors', help='store used sensors in locations', action='store_true')
+    parser.add_argument('--multi-model', help="Use a model per sensor", action='store_true')
     args = parser.parse_args()
     if args.setup_sensors:
         setup_location_sensors()
@@ -308,4 +345,4 @@ if __name__ == "__main__":
     else:
         if args.intersection == '':
             parser.error("Please specify an intersection")
-        run_single_intersection((args.intersection, args.write_anomaly, args.incomplete, True))
+        run_single_intersection((args.intersection, args.write_anomaly, args.incomplete, True, args.multi_model))
