@@ -5,7 +5,7 @@ import pymongo
 import pluck
 import csv
 import yaml
-from index import SWARM_CONFIGS_DIR, MAX_COUNT, getEngineDir
+from index import SWARM_CONFIGS_DIR, getEngineDir
 import pprint
 import operator
 from collections import Counter
@@ -14,7 +14,11 @@ __author__ = 'Jonathan Mackenzie'
 try:
     path = os.path.join(os.path.dirname(getEngineDir()), 'connection.yaml')
     with open(path, 'r') as f:
-        mongo_uri = yaml.load(f)['mongo_uri']
+        conf = yaml.load(f)
+        mongo_uri = conf['mongo_uri']
+        mongo_collection = conf['mongo_collection']
+        mongo_database = conf['mongo_database']
+        max_vehicles = conf['max_vehicles']
 except:
     raise Exception('No connection.yaml with mongo_uri defined! please make one with a mongo_uri variable')
 
@@ -25,7 +29,7 @@ DESCRIPTION = "Create a swarm config for a given intersection if it doesn't alre
 
 parser = argparse.ArgumentParser(description=DESCRIPTION)
 parser.add_argument('--max', dest='max', type=int, help="Max number of cars to use in the input fields",
-                    default=MAX_COUNT)
+                    default=max_vehicles)
 parser.add_argument('--overwrite', help="Overwrite any old config with this name", action='store_true')
 parser.add_argument('intersection', type=str, help="Name of the intersection")
 
@@ -44,8 +48,8 @@ def getSwarmCache(intersection, overwrite=False):
         else:
             print "No cache file exists for", intersection, ".... creating new one in", cache_file
         with open(cache_file, 'wb') as csv_out, pymongo.MongoClient(mongo_uri) as client:
-            db = client.mack0242
-            collection = db['ACC_201306_20130819113933']
+            db = client[mongo_database]
+            collection = db[mongo_collection]
             readings = collection.find({'site_no': intersection})
             sensors = getSensors(intersection)
             fieldnames = ['timestamp'] + sensors
@@ -73,8 +77,8 @@ def getSwarmCache(intersection, overwrite=False):
 
 def getSensors(intersection):
     with pymongo.MongoClient(mongo_uri) as client:
-        db = client.mack0242
-        collection = db['ACC_201306_20130819113933']
+        db = client[mongo_database]
+        collection = db[mongo_collection]
         reading = collection.find_one({'site_no': intersection})
         if reading is None:
             raise Exception("No such intersection with site_no '%s' exists" % intersection)

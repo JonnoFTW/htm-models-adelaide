@@ -79,10 +79,25 @@ some form of prediction.
 Usage
 -----
 
-1. Import the SCATS data
-2. Use `create_swam_config.py` to generate a swarm configuration for the target intersection
-3. Run the swarm using `index.py` to generate the model parameters.
-4. Run the model using `index.py` and evaluate anomaly results
+1. Import the SCATS data into your mongo instance
+2. Create a `connection.yaml` file in the root directory with:
+   * mongo_uri: (`string`) mongo connection URI
+   * mongo_database: (`string`) mongo database to use
+   * mongo_collection: (`string`) mongo collection to get vehicle flow data from
+   * GMAPS_API_KEY: (`string`) google maps api key for use with site
+   * pool_size: (`int`) number of cores to use when using parallel processing
+   * MODEL_PARAMS_DIR: (`directory`) folder where model params will be stored
+   * MODEL_CACHE_DIR: (`directory`) folder where models are serialised to 
+   * SWARM_CONFIGS_DIR: (`directory`) folder where swarm configurations are stored
+   * max_vehicles: (`int`) highest number of vehicles allowed per time period (200 is a good value)
+
+3. Use `create_swam_config.py` to generate a swarm configuration for the target intersection
+4. Run the swarm using `index.py` to generate the model parameters.
+5. Run the model using `index.py` and evaluate anomaly results
+
+Results
+-------
+If you specifu
 
 TODO
 ----

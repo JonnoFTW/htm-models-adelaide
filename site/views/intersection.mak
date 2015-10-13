@@ -132,11 +132,19 @@
     %endif
 </div>
 <script type="text/javascript">
+var None = null;
 %if has_anything:
 var aData =[
        % for i in scores:
         % if 'anomaly_score' in i:
-          [new Date(Date.UTC(${"{},{},{},{},{}".format(i['datetime'].year, i['datetime'].month-1, i['datetime'].day, i['datetime'].hour, i['datetime'].minute)})), ${i['anomaly_score']}],
+          [new Date(Date.UTC(${"{},{},{},{},{}".format(i['datetime'].year, i['datetime'].month-1, i['datetime'].day, i['datetime'].hour, i['datetime'].minute)})),
+           ${i['anomaly_score']},
+           % if 'anomaly_likelihood' in i:
+              ${i['anomaly_likelihood']}
+           %else:
+               null
+           %endif
+            ],
         % endif
        % endfor
 ];
@@ -150,11 +158,7 @@ var pData = [
             %else:
                 null,
             %endif
-            % if i['prediction']['prediction'] is None:
-                null
-            % else:
-                ${i['prediction']['prediction']}
-            %endif
+            ${i['prediction']['prediction']}
         %else:
             ${sum(filter(lambda x: x< max_vehicles,i['readings'].values()))},
         %endif
@@ -183,6 +187,10 @@ if (aData.length ==0) {
       ylabel: 'Anomaly',
       xlabel: 'Date',
       anomaly: {
+            color: "blue",
+            strokeWidth: 2.0,
+        },
+      likelihood: {
             color: "red",
             strokeWidth: 2.0,
         },
@@ -197,7 +205,7 @@ if (aData.length ==0) {
       highlightCallback: function(event, x, point, row, seriesName) {
           highlightX(predictionChart, row);
       },
-      labels: ['UTC', 'anomaly'],
+      labels: ['UTC', 'anomaly', 'likelihood'],
        <%include file="dygraph_weekend.js"/>
     });
 }

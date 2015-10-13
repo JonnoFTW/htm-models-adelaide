@@ -8,11 +8,12 @@ import importlib
 import os
 import time
 import pymongo
+import pyprind
+import yaml
 
 from nupic.frameworks.opf.modelfactory import ModelFactory
-import pyprind
+from nupic.algorithms import anomaly_likelihood
 
-import yaml
 global CACHE_MODELS
 
 
@@ -101,13 +102,12 @@ def createModel(intersection):
                 if sensor_counts[k] == 0:
                     continue
                 modelParams['modelParams']['sensorParams']['encoders'][k] = {
-                    'clipInput': True,
+                   # 'clipInput': True,
                     'fieldname': k,
-                    'maxval': max_vehicles,
-                    'minval': 0,
-                    'n': 1050,
+                    'resolution': 50,
+                    'n': 400,
                     'name': k,
-                    'type': 'ScalarEncoder',
+                    'type': 'RandomDistributedScalarEncoder',
                     'w': 21
                 }
             modelParams['modelParams']['sensorParams']['encoders']['timestamp_dayOfWeek'] = {'fieldname': 'timestamp',
@@ -173,6 +173,7 @@ def get_encoders(model):
 
 def runIoThroughNupic(readings, intersection, write_anomaly, collection, progress=True):
     model = createModel(intersection)
+    anomaly_likelihood_helper = anomaly_likelihood.AnomalyLikelihood()
     if model is None:
         print "No model could be made for intersection", intersection
         return
@@ -200,18 +201,23 @@ def runIoThroughNupic(readings, intersection, write_anomaly, collection, progres
         result = model.run(fields)
 
         prediction = result.inferences["multiStepBestPredictions"][1]
-        anomalyScore = result.inferences["anomalyScore"]
+        anomaly_score = result.inferences["anomalyScore"]
+        likelihood = anomaly_likelihood_helper.anomalyProbability(
+            i['readings'][pfield], anomaly_score, timestamp)
+        likelihood = anomaly_likelihood_helper.computeLogLikelihood(
+            likelihood)
         if write_anomaly:
-            write_anomaly_out(i, anomalyScore, pfield, prediction, collection)
+            write_anomaly_out(i, anomaly_score, likelihood, pfield, prediction, collection)
     if progress:
         print
     print "Read", counter, "lines"
     save_model(model, intersection)
 
 
-def write_anomaly_out(doc, anomalyScore, pfield, prediction, collection):
+def write_anomaly_out(doc, anomaly_score, likelihood, pfield, prediction, collection):
     collection.update_one({"_id": doc["_id"]},
-                          {"$set": {"anomaly_score": anomalyScore}})
+                          {"$set": {"anomaly_score": anomaly_score,
+                                    "anomaly_likelihood": likelihood}})
     next_doc = collection.find_one({'site_no': doc['site_no'],
                                    'datetime': doc['datetime'] + timedelta(minutes=5)})
     if next_doc is not None:
