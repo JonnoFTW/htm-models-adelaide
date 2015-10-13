@@ -136,11 +136,11 @@ var None = null;
 %if has_anything:
 var aData =[
        % for i in scores:
-        % if 'anomaly_score' in i:
+        % if 'anomaly' in i:
           [new Date(Date.UTC(${"{},{},{},{},{}".format(i['datetime'].year, i['datetime'].month-1, i['datetime'].day, i['datetime'].hour, i['datetime'].minute)})),
-           ${i['anomaly_score']},
-           % if 'anomaly_likelihood' in i:
-              ${i['anomaly_likelihood']}
+           ${i['anomaly']['score']},
+           % if 'likelihood' in i['anomaly']:
+              ${i['anomaly']['likelihood']}
            %else:
                null
            %endif
@@ -167,12 +167,14 @@ var pData = [
 ];
 
 var zoomGraph = function(graph, min, max) {
+    if(graph)
     graph.updateOptions({
         dateWindow: [min, max]
     });
 };
 var highlightX = function(graph, row) {
-    graph.setSelection(row);
+    if(graph)
+        graph.setSelection(row);
 };
 
 var dispFormat = "%d/%m/%y %H:%M";

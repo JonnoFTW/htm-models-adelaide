@@ -69,11 +69,12 @@ def get_most_used_sensors(intersection):
 
 def createModel(intersection):
     modelDir = getModelDir(intersection)
-    if False and os.path.isdir(modelDir):
+    if CACHE_MODELS and os.path.isdir(modelDir):
         # Read in the cached model
         print "Loading cached model for {} from {}...".format(intersection, modelDir)
         return ModelFactory.loadFromCheckpoint(modelDir)
     else:
+        start = time.time()
         # redo the modelParams to use the actual sensor names
         modelParams = getModelParamsFromName('3001')
         modelParams['modelParams']['sensorParams']['encoders'].clear()
@@ -95,7 +96,7 @@ def createModel(intersection):
             collection = client[mongo_database][mongo_collection]
             doc = collection.find_one({'site_no': intersection})
 
-            for k, v in doc['readings'].items():
+            for k in doc['readings']:
                 # don't model unused sensors
                 # could run into errors when the sensor
                 # was damaged for more than the sample period though
@@ -104,16 +105,16 @@ def createModel(intersection):
                 modelParams['modelParams']['sensorParams']['encoders'][k] = {
                    # 'clipInput': True,
                     'fieldname': k,
-                    'resolution': 50,
+                    'resolution': 10,
                     'n': 400,
                     'name': k,
                     'type': 'RandomDistributedScalarEncoder',
                     'w': 21
                 }
-            modelParams['modelParams']['sensorParams']['encoders']['timestamp_dayOfWeek'] = {'fieldname': 'timestamp',
-                                                                                  'name': 'timestamp_dayOfWeek',
-                                                                                  'type': 'DateEncoder',
-                                                                                  'dayOfWeek': (21, 1)}
+            # modelParams['modelParams']['sensorParams']['encoders']['timestamp_dayOfWeek'] = {'fieldname': 'timestamp',
+            #                                                                       'name': 'timestamp_dayOfWeek',
+            #                                                                       'type': 'DateEncoder',
+            #                                                                       'dayOfWeek': (21, 1)}
             modelParams['modelParams']['sensorParams']['encoders']['timestamp_timeOfDay'] = {
                                                                                   'fieldname': 'timestamp',
                                                                                   'name': 'timestamp_timeOfDay',
@@ -127,7 +128,7 @@ def createModel(intersection):
 
         model = ModelFactory.create(modelParams)
         model.enableInference({'predictedField': pField})
-        print "Creating model for {}, on pid {}".format(intersection, os.getpid())
+        print "Creating model for {}, in {}s".format(intersection, time.time() - start)
         return model
 
 
@@ -173,7 +174,7 @@ def get_encoders(model):
 
 def runIoThroughNupic(readings, intersection, write_anomaly, collection, progress=True):
     model = createModel(intersection)
-    anomaly_likelihood_helper = anomaly_likelihood.AnomalyLikelihood()
+    anomaly_likelihood_helper = anomaly_likelihood.AnomalyLikelihood(600, 200)
     if model is None:
         print "No model could be made for intersection", intersection
         return
@@ -182,7 +183,7 @@ def runIoThroughNupic(readings, intersection, write_anomaly, collection, progres
     total = readings.count(True)
     encoders = get_encoders(model)
     if progress:
-        progBar = pyprind.ProgBar(total)
+        progBar = pyprind.ProgBar(total, width=50)
     for i in readings:
         counter += 1
         if progress:
@@ -204,8 +205,7 @@ def runIoThroughNupic(readings, intersection, write_anomaly, collection, progres
         anomaly_score = result.inferences["anomalyScore"]
         likelihood = anomaly_likelihood_helper.anomalyProbability(
             i['readings'][pfield], anomaly_score, timestamp)
-        likelihood = anomaly_likelihood_helper.computeLogLikelihood(
-            likelihood)
+        #likelihood = anomaly_likelihood_helper.computeLogLikelihood(likelihood)
         if write_anomaly:
             write_anomaly_out(i, anomaly_score, likelihood, pfield, prediction, collection)
     if progress:
@@ -216,8 +216,7 @@ def runIoThroughNupic(readings, intersection, write_anomaly, collection, progres
 
 def write_anomaly_out(doc, anomaly_score, likelihood, pfield, prediction, collection):
     collection.update_one({"_id": doc["_id"]},
-                          {"$set": {"anomaly_score": anomaly_score,
-                                    "anomaly_likelihood": likelihood}})
+                          {"$set": {"anomaly": {"score":anomaly_score,"likelihood": likelihood}}})
     next_doc = collection.find_one({'site_no': doc['site_no'],
                                    'datetime': doc['datetime'] + timedelta(minutes=5)})
     if next_doc is not None:
@@ -235,9 +234,10 @@ def save_model(model, site_no):
     if model is None:
         print "Not saving model for", site_no
         return
+    start = time.time()
     out_dir = getModelDir(site_no)
-    print "Caching model to", out_dir, "on pid", os.getpid(), "id", id(model)
     model.save(out_dir)
+    print "Caching model to {} in {}s".format(out_dir, time.time() - start)
 
 
 def run_single_intersection(args):

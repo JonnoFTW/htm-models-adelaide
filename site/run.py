@@ -141,7 +141,7 @@ def get_anomaly_scores(from_date=None, to_date=None, intersection='3001', anomal
         if anomaly_threshold is not None:
             query['anomaly_score'] = {'$gte': float(anomaly_threshold)}
         return coll.find(query,
-                         ['datetime', 'site_no', 'prediction', 'readings', 'anomaly_score', 'anomaly_likelihood']).\
+                         ['datetime', 'site_no', 'prediction', 'readings', 'anomaly']).\
                 sort('datetime', pymongo.ASCENDING)
 
 

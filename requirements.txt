@@ -7,3 +7,4 @@ pymongo
 numpy
 pyyaml
 mako
+pyprind

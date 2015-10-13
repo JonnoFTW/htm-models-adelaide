@@ -95,9 +95,30 @@ Usage
 4. Run the swarm using `index.py` to generate the model parameters.
 5. Run the model using `index.py` and evaluate anomaly results
 
+##### Engine Arguments
+
+* `--write-anomaly` : Write the anomaly score back into the document
+* `--all`: Run all readings through models in parallel (can you specify a comma separated list of intersections with 
+`--intersection` with this option, eg. `--all --intersection 3001,3002,3085`)
+* `--intersection`:  Name of the intersection(s) to process
+* `--incomplete`: Only process those readings without anomaly values
+* `--popular`: Show the most popular sensor for an intersection
+* `--cache-models`: Attempt to load models from cache and store them to disk
+
+###### Examples
+
+To run all the data for an intersection against a model do:
+
+`./index.py --intersection 3085 --write-anomaly`
+
+To run all models in parallel do:
+
+`./index.py --all --write-anomaly
+
 Results
 -------
-If you specifu
+Results will be stored in mongodb, alongside the readings for a particular intersection
+at a particular time, the prediction and anomaly score and anomaly likelihood will be saved.
 
 TODO
 ----
