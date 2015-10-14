@@ -152,10 +152,14 @@ def create_single_sensor_model(sensor, intersection):
     print "Creating model for {}:{} in {}s".format(intersection, sensor, time.time() - start)
     return model
 
-def setup_location_sensors():
+def setup_location_sensors(intersection):
     with pymongo.MongoClient(mongo_uri) as client:
         locations = client[mongo_database]['locations']
-        for i in locations.find():
+        if not intersection:
+            query = {}
+        else:
+            query = {'intersection_number': {'$in': intersection.split(',')}}
+        for i in locations.find(query):
             counts = get_most_used_sensors(i['intersection_number']).most_common()
             if len(counts) == 0:
                 continue
@@ -327,11 +331,11 @@ if __name__ == "__main__":
     parser.add_argument('--incomplete', help="Analyse those intersections not done yet", action='store_true')
     parser.add_argument('--popular', help="Show the most popular sensor for an intersection", action='store_true')
     parser.add_argument('--cache-models', help="Cache models", action='store_true')
-    parser.add_argument('--setup-sensors', help='store used sensors in locations', action='store_true')
+    parser.add_argument('--setup-sensors', help='store used sensors in locations. Use --intersection to specify many otherwise it will do all of them', action='store_true')
     parser.add_argument('--multi-model', help="Use a model per sensor", action='store_true')
     args = parser.parse_args()
     if args.setup_sensors:
-        setup_location_sensors()
+        setup_location_sensors(args.intersection)
         sys.exit()
     CACHE_MODELS = args.cache_models
     setupFolders()

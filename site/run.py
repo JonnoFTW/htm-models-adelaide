@@ -93,7 +93,7 @@ def _get_intersections():
         return coll.find({'intersection_number': {'$exists': True}}, {'_id': False})
 
 
-def get_accident_near(time_start, time_end, intersection, radius=100):
+def get_accident_near(time_start, time_end, intersection, radius=150):
     """
     Return any accidents at this time,
     should probably be listed in the app
