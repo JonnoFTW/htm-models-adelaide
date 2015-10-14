@@ -93,7 +93,7 @@ def _get_intersections():
         return coll.find({'intersection_number': {'$exists': True}}, {'_id': False})
 
 
-def get_accident_near(time_start, time_end, intersection):
+def get_accident_near(time_start, time_end, intersection, radius=100):
     """
     Return any accidents at this time,
     should probably be listed in the app
@@ -112,7 +112,7 @@ def get_accident_near(time_start, time_end, intersection):
             'loc': {
                 '$geoNear': {
                    '$geometry': location['loc'],
-                    '$maxDistance': 100
+                    '$maxDistance': radius
                 }
             },
             'datetime': {
@@ -136,14 +136,12 @@ def get_anomaly_scores(from_date=None, to_date=None, intersection='3001', anomal
         query = {'site_no': intersection}
 
         if from_date is not None:
-              query['datetime']['$gte'] = datetime.strptime(from_date, fmt)
+            query['datetime']['$gte'] = datetime.strptime(from_date, fmt)
         if to_date is not None:
             query['datetime']['$lte'] = datetime.strptime(to_date, fmt)
         if anomaly_threshold is not None:
             query['anomaly_score'] = {'$gte': float(anomaly_threshold)}
-        return coll.find(query,
-                         ['datetime', 'site_no', 'prediction', 'readings', 'anomaly']).\
-                sort('datetime', pymongo.ASCENDING)
+        return coll.find(query).sort('datetime', pymongo.ASCENDING)
 
 
 def _get_daily_volume(data, hour=None):
@@ -337,7 +335,7 @@ def show_intersection(request):
     time_start = anomaly_score[0]['datetime']
     time_end = anomaly_score[-1]['datetime']
     try:
-        intersection['sensors'] = sorted(map(int, intersection['sensors']))
+        intersection['sensors'] = intersection['sensors']
     except:
         intersection['sensors'] = 'Unknown'
     return render_to_response(
@@ -349,6 +347,12 @@ def show_intersection(request):
         request=request
     )
 
+
+def get_accident_near_json(request):
+    args = request.matchdict
+    intersection, time_start, time_end = args['intersection'], args['time_start'], args['time_end']
+    radius = args['radius']
+    return get_accident_near(time_start, time_end, intersection, radius)
 
 if __name__ == '__main__':
     config = Configurator()
@@ -363,8 +367,8 @@ if __name__ == '__main__':
     config.add_view(show_intersection, route_name='intersection')
     config.add_route('intersections', '/intersections')
     config.add_route('reports', '/reports/{intersection}/{report}')
-    config.add_route('accidents', '/accidents/{intersection}/{time}')
-    config.add_view(get_accident_near, route_name='accidents', renderer='json')
+    config.add_route('accidents', '/accidents/{intersection}/{time_start}/{time_end}/{radius}')
+    config.add_view(get_accident_near_json, route_name='accidents', renderer='json')
     config.add_view(show_report, route_name='reports')
     config.add_view(list_intersections, route_name='intersections')
     config.add_static_view(name='assets', path='assets')

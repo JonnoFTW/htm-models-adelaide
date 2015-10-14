@@ -28,7 +28,6 @@ try:
         mongo_uri = conf['mongo_uri']
         mongo_database = conf['mongo_database']
         mongo_collection = conf['mongo_collection']
-        POOL_SIZE = conf['pool_size']
         MODEL_PARAMS_DIR = conf['MODEL_PARAMS_DIR']
         MODEL_CACHE_DIR = conf['MODEL_CACHE_DIR']
         SWARM_CONFIGS_DIR = conf['SWARM_CONFIGS_DIR']
@@ -157,7 +156,7 @@ def setup_location_sensors():
     with pymongo.MongoClient(mongo_uri) as client:
         locations = client[mongo_database]['locations']
         for i in locations.find():
-            counts = get_most_used_sensors(i['intersection_number']).items()
+            counts = get_most_used_sensors(i['intersection_number']).most_common()
             if len(counts) == 0:
                 continue
             locations.update_one({'_id': i['_id']},
@@ -197,7 +196,7 @@ def get_encoders(model):
 def process_readings(readings, intersection, write_anomaly, collection, progress=True, multi_model=False):
     counter = 0
     total = readings.count(True)
-    anomaly_likelihood_helper = anomaly_likelihood.AnomalyLikelihood(600, 200)
+    anomaly_likelihood_helper = anomaly_likelihood.AnomalyLikelihood(1000, 200)
     if multi_model:
         with pymongo.MongoClient(mongo_uri) as client:
             loc = client[mongo_database]['locations'].find_one({'intersection_number': intersection})
@@ -221,7 +220,7 @@ def process_readings(readings, intersection, write_anomaly, collection, progress
         if multi_model:
             predictions, anomalies = {}, {}
             # each sensor should probably be in its own process...
-            for sensor, model in models.items():
+            for sensor, model in models.iteritems():
                 fields = {"timestamp": timestamp, sensor: i['readings'][sensor]}
                 result = model.run(fields)
                 prediction = result.inferences["multiStepBestPredictions"][1]
@@ -315,7 +314,7 @@ def run_all_intersections(write_anomaly, incomplete, intersections):
                 query = {key:  {'$regex': '3\d\d\d'}}
             locations = list(collection.find(query))
     gen = [(str(l[key]), write_anomaly, incomplete, False) for l in locations]
-    pool = Pool(POOL_SIZE)
+    pool = Pool()
     pool.map(run_single_intersection, gen)
     print("TOTAL TIME: --- %s seconds ---" % (time.time() - start_time))
 

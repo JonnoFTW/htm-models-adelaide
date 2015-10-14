@@ -1,7 +1,9 @@
 <%
 from bson import json_util
 import json
-pfield = intersection['sensors'][0]
+pfield = str(intersection['sensors'][0])
+popular_sensors = map(int,intersection['sensors'])
+intersection['sensors'] = sorted(map(int,intersection['sensors']))
 %>
 <%include file="header.html"/>
 %if intersection is None:
@@ -23,12 +25,13 @@ pfield = intersection['sensors'][0]
 
 <%
     has_anything = len(scores) > 0
-    has_predictions = has_anything and 'prediction' in scores[0]
+    has_predictions = has_anything and 'predictions' in scores[1]
     del intersection['_id']
 %>
 
 <script type="text/javascript" src="//cdn.jsdelivr.net/bootstrap.daterangepicker/2/daterangepicker.js"></script>
 <script type="text/javascript" src="/assets/fontawesome-markers.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
 <div class="container">
   <h1>Intersection: ${intersection['intersection_number']}</h1>
     <div class="row">
@@ -97,7 +100,16 @@ pfield = intersection['sensors'][0]
                     <div class="panel-heading">
                         <i class="fa fa-line-chart fa-fw"></i>
                         %if has_predictions:
-                            Prediction and Observation on Sensor: ${scores[0]['prediction']['sensor']}
+                            Prediction and Observation
+                            <div class="dropdown pull-right">
+                                <a href="#" class="dropdown-toggle" data-toggle="dropdown" id="sensor-label">Sensor: ${pfield}<b class="caret"></b></a>
+
+                                <ul class="dropdown-menu" role="menu" aria-labelledby="prediction-sensor-menu">
+                                    %for sensor in popular_sensors:
+                                        <li><a  class="sensor-swapper">${sensor}</a></li>
+                                    %endfor
+                                </ul>
+                            </div>
                         %else:
                             Total Traffic Flow for intersection ${intersection['intersection_number']}
                         %endif
@@ -154,7 +166,7 @@ pfield = intersection['sensors'][0]
                         <th>Total Damage</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id='incidents'>
                         % for i in incidents:
                         <tr>
                             <td>${i['datetime']}</td>
@@ -185,39 +197,44 @@ pfield = intersection['sensors'][0]
 </div>
 <script type="text/javascript">
 var None = null;
+var incidents = ${json.dumps(incidents,default=json_util.default)|n};
+var pfield = '${pfield}';
 %if has_anything:
-var aData =[
-       % for i in scores:
-        % if 'anomaly' in i:
-          [new Date(Date.UTC(${"{},{},{},{},{}".format(i['datetime'].year, i['datetime'].month-1, i['datetime'].day, i['datetime'].hour, i['datetime'].minute)})),
-           ${i['anomaly'][pfield]['score']},
-           ${i['anomaly'][pfield]['likelihood']},
-           % if len([x for x in incidents if x['datetime'] == i['datetime']]) != 0:
-            1.1
-           %else:
-            null,
-            %endif
-            ],
-        % endif
-       % endfor
-];
+var allData = ${json.dumps(scores,default=json_util.default)|n};
 
-var pData = [
-    % for i in scores:
-        [new Date(Date.UTC(${"{},{},{},{},{}".format(i['datetime'].year, i['datetime'].month-1, i['datetime'].day, i['datetime'].hour, i['datetime'].minute)})),
-        %if has_predictions:
-            % if i['readings'][pfield] < max_vehicles:
-               ${i['readings'][pfield]},
-            %else:
-                null,
-            %endif
-            ${i['prediction'][pfield]['prediction']}
-        %else:
-            ${sum(filter(lambda x: x< max_vehicles,i['readings'].values()))},
-        %endif
-        ],
-    % endfor
-];
+var aData = function(sensor){
+    //return an array made from all data
+    var array = [];
+    allData.forEach(function(row, index, in_array) {
+        // columns are: date,anomaly, likelihood, incident, incident_predict],
+        var row_time = row["datetime"]["$date"];
+        array[index] = [new Date(row_time),
+                        row['anomalies'][sensor]['score'],
+                        row['anomalies'][sensor]['likelihood'],
+                        _.find(incidents,function(n){return n['datetime']['$date'] == row_time;})?1.1:null,
+                        _.filter(row['anomalies'],function(n){return n['likelihood'] > 0.9;}).length > 3?1.2:null
+                       ];
+    });
+    return array;
+};
+
+## %else:
+ ##           ${sum(filter(lambda x: x< max_vehicles,i['readings'].values()))},
+var pData = function(sensor) {
+    var array = [];
+    allData.forEach(function(row, index, in_array) {
+        // columns are: date,reading, prediction,
+        var row_time = row["datetime"]["$date"];
+        array[index] = [new Date(row_time),
+                        row['readings'][sensor] < ${max_vehicles}?row['readings'][sensor]:null];
+        if (row['predictions'] == undefined) {
+            array[index].push(null);
+        } else {
+            array[index].push(row['predictions'][sensor] < ${max_vehicles}?row['predictions'][sensor]:null);
+        }
+    });
+    return array;
+};
 
 var zoomGraph = function(graph, min, max) {
     if(graph)
@@ -229,18 +246,25 @@ var highlightX = function(graph, row) {
     if(graph)
         graph.setSelection(row);
 };
-
+// highlight the ith incident in the map
+// and on the table
+var highlightAccident = function(idx) {
+    var query = '#incidents > tr:nth-child('+idx+')';
+    $(query).addClass('info').siblings().removeClass('info');
+};
 var dispFormat = "%d/%m/%y %H:%M";
-if (aData.length ==0) {
+var anomalyData = aData(pfield);
+if (anomalyData.length ==0) {
     $('#anomaly-chart').before('<div class="bs-callout bs-callout-danger">\
   <h4>Nothing to Display!</h4>\
   There\'s no anomaly values for this time period. It might not have been analysed yet.\
 </div>').height('0');
 } else {
-    var anomalyChart = new Dygraph(document.getElementById('anomaly-chart'), aData, {
+    var anomalyChart = new Dygraph(document.getElementById('anomaly-chart'), anomalyData, {
       title: 'Anomaly value for intersection ${intersection['intersection_number']}',
       ylabel: 'Anomaly',
       xlabel: 'Date',
+      highlightSeriesOpts: { strokeWidth: 3 },
       anomaly: {
             color: "blue",
             strokeWidth: 2.0,
@@ -254,9 +278,14 @@ if (aData.length ==0) {
             strokeWidth: 0.0,
             pointSize: 4,
       },
+      incident_predict: {
+            color: "orange",
+            strokeWidth: 0.0,
+            pointSize: 4,
+      },
       axes: {
         y: {
-            valueRange: [0,1.2]
+            valueRange: [0,1.3]
         }
       },
       zoomCallback: function(min, max, yRanges) {
@@ -264,24 +293,32 @@ if (aData.length ==0) {
       },
       highlightCallback: function(event, x, point, row, seriesName) {
           highlightX(predictionChart, row);
+
+          if (seriesName === 'incident') {
+          // find idx of point[2] in incidents array
+          // using xval
+            highlightAccident(1+_.findIndex(incidents, function(x){return x["datetime"]["$date"] == point[2].xval;}));
+          }
       },
-      labels: ['UTC', 'anomaly', 'likelihood', 'incident'],
+      labels: ['UTC', 'anomaly', 'likelihood', 'incident', 'incident_predict'],
        <%include file="dygraph_weekend.js"/>
     });
 }
-if (pData.length ==0) {
+var predictionData = pData(pfield);
+if (predictionData.length ==0) {
     $('#prediction-chart').before('<div class="bs-callout bs-callout-danger">\
   <h4>Nothing to Display!</h4>\
   There\'s no predictions or readings for this time period. It might not have been analysed yet.\
 </div>').height('0');
 } else {
-    var predictionChart = new Dygraph(document.getElementById('prediction-chart'), pData, {
+    var predictionChart = new Dygraph(document.getElementById('prediction-chart'), predictionData, {
+     labels: ['UTC','Reading','Prediction'],
+
       %if has_predictions:
-          title: 'Prediction and Observation on Sensor: ${intersection['sensors'][0]}',
-          labels: ['UTC','Reading','Prediction'],
+          title: 'Prediction and Observation on Sensor: '+ pfield,
+
       %else:
         title: 'Total Traffic Flow for intersection ${intersection['intersection_number']}',
-        labels: ['UTC','Reading'],
       %endif
       ylabel: 'Volume',
       xlabel: 'Date',
@@ -375,11 +412,6 @@ $(document).ready(function() {
     div: '#map-incident',
     zoom: 15
   });
-  var incidents = [
-  %for i in incidents:
-    ${json.dumps(i,default=json_util.default)|n},
-  %endfor
-  ];
   mapCrash.addMarker(mainMarker);
   mapCrash.drawCircle({lat:lat,lng:lng,radius:100,
         editable: false,
@@ -391,7 +423,6 @@ $(document).ready(function() {
   });
   $.each(incidents, function(){
 
-      console.log(this);
       var windowStr = 'Yep';
       mapCrash.addMarker({
         lat: this.loc['coordinates'][1],
@@ -410,8 +441,6 @@ $(document).ready(function() {
       });
   });
   function toggleChevron(e) {
-    console.log('chevron clicked');
-    console.log($(e.target));
       $(e.target)
         .parent()
         .find('span.glyphicon')
@@ -419,6 +448,13 @@ $(document).ready(function() {
   }
   $('#accordion').on('hidden.bs.collapse', toggleChevron);
   $('#accordion').on('shown.bs.collapse', toggleChevron);
+
+  $('.sensor-swapper').click(function() {
+     var s = $(this).text();
+     predictionChart.updateOptions( { 'file': pData(s) , 'title': 'Prediction and Observation on Sensor: '+s});
+     $('#sensor-label').html('Sensor: '+s+' <b class="caret"></b>');
+     anomalyChart.updateOptions( { 'file': aData(s) });
+  });
 });
 
 
