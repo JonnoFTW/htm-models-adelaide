@@ -1,9 +1,6 @@
 <%
 from bson import json_util
 import json
-pfield = str(intersection['sensors'][0])
-popular_sensors = map(int,intersection['sensors'])
-intersection['sensors'] = sorted(map(int,intersection['sensors']))
 %>
 <%include file="header.html"/>
 %if intersection is None:
@@ -24,9 +21,12 @@ intersection['sensors'] = sorted(map(int,intersection['sensors']))
 %else:
 
 <%
-    has_anything = len(scores) > 0
-    has_predictions = has_anything and 'predictions' in scores[1]
-    del intersection['_id']
+pfield = str(intersection['sensors'][0])
+popular_sensors = map(int,intersection['sensors'])
+intersection['sensors'] = sorted(map(int,intersection['sensors']))
+has_anything = len(scores) > 0
+has_predictions = has_anything and 'predictions' in scores[1]
+del intersection['_id']
 %>
 
 <script type="text/javascript" src="//cdn.jsdelivr.net/bootstrap.daterangepicker/2/daterangepicker.js"></script>
@@ -58,6 +58,10 @@ intersection['sensors'] = sorted(map(int,intersection['sensors']))
                                 % endfor
                             % elif k == 'loc':
                                 Lat: ${v['coordinates'][1]}, Lng: ${v['coordinates'][0]}
+                            % elif k == 'sensors':
+                                %for sensor in v:
+                                    <a href="#" class="sensor-swapper">${sensor}</a>
+                                %endfor
                             % else:
                                 ${v}
                             % endif
@@ -81,15 +85,7 @@ intersection['sensors'] = sorted(map(int,intersection['sensors']))
 
         </div>
         <div class="col-lg-6">
-            <div class="panel panel-default">
-                <div class="panel-heading">
-                    <i class="fa fa-map fa-fw"></i> Map
-                </div>
-                <div class="panel-body">
-                    <div style="height:300px" id="map"></div>
-                </div>
-                <!-- /.panel-body -->
-            </div>
+
             <%include file="time_range_panel.html"/>
         </div>
     </div>
@@ -100,7 +96,7 @@ intersection['sensors'] = sorted(map(int,intersection['sensors']))
                     <div class="panel-heading">
                         <i class="fa fa-line-chart fa-fw"></i>
                         %if has_predictions:
-                            Prediction and Observation
+                            Observation
                             <div class="dropdown pull-right">
                                 <a href="#" class="dropdown-toggle" data-toggle="dropdown" id="sensor-label">Sensor: ${pfield}<b class="caret"></b></a>
 
@@ -208,12 +204,19 @@ var aData = function(sensor){
     allData.forEach(function(row, index, in_array) {
         // columns are: date,anomaly, likelihood, incident, incident_predict],
         var row_time = row["datetime"]["$date"];
-        array[index] = [new Date(row_time),
+        if(row['anomalies'] !== undefined) {
+            anomalyCount = _.filter(row['anomalies'],function(n){return n['likelihood'] > 0.9;}).length;
+            array[index] = [new Date(row_time),
                         row['anomalies'][sensor]['score'],
                         row['anomalies'][sensor]['likelihood'],
                         _.find(incidents,function(n){return n['datetime']['$date'] == row_time;})?1.1:null,
-                        _.filter(row['anomalies'],function(n){return n['likelihood'] > 0.9;}).length > 3?1.2:null
+                         anomalyCount > 2?anomalyCount/10.0:null
                        ];
+       } else {
+            array[index] = [new Date(row_time),null,null
+            ,_.find(incidents,function(n){return n['datetime']['$date'] == row_time;})?1.1:null,
+            null];
+       }
     });
     return array;
 };
@@ -227,15 +230,15 @@ var pData = function(sensor) {
         var row_time = row["datetime"]["$date"];
         array[index] = [new Date(row_time),
                         row['readings'][sensor] < ${max_vehicles}?row['readings'][sensor]:null];
-        if (row['predictions'] == undefined) {
+       /* if (row['predictions'] == undefined) {
             array[index].push(null);
         } else {
             array[index].push(row['predictions'][sensor] < ${max_vehicles}?row['predictions'][sensor]:null);
-        }
+        }*/
     });
     return array;
 };
-
+var crashMarkers = [];
 var zoomGraph = function(graph, min, max) {
     if(graph)
     graph.updateOptions({
@@ -248,9 +251,26 @@ var highlightX = function(graph, row) {
 };
 // highlight the ith incident in the map
 // and on the table
+
+var crashDefault = '#B71C1C';
+var crashSelected = '#D9EDF7';
+var markerIcon = function(selected) {
+    return {
+            path: fontawesome.markers.EXCLAMATION_CIRCLE,
+            scale: 0.5,
+            strokeWeight: 0.2,
+            strokeColor: 'black',
+            strokeOpacity: 1,
+            fillColor: selected?crashSelected:crashDefault,
+            fillOpacity: 1,
+           };
+};
 var highlightAccident = function(idx) {
     var query = '#incidents > tr:nth-child('+idx+')';
     $(query).addClass('info').siblings().removeClass('info');
+    $.each(crashMarkers, function(index, obj){
+        obj.setIcon(markerIcon(index==idx));
+    });
 };
 var dispFormat = "%d/%m/%y %H:%M";
 var anomalyData = aData(pfield);
@@ -285,7 +305,7 @@ if (anomalyData.length ==0) {
       },
       axes: {
         y: {
-            valueRange: [0,1.3]
+           // valueRange: [0,1.5]
         }
       },
       zoomCallback: function(min, max, yRanges) {
@@ -312,10 +332,10 @@ if (predictionData.length ==0) {
 </div>').height('0');
 } else {
     var predictionChart = new Dygraph(document.getElementById('prediction-chart'), predictionData, {
-     labels: ['UTC','Reading','Prediction'],
+     labels: ['UTC','Reading'],
 
       %if has_predictions:
-          title: 'Prediction and Observation on Sensor: '+ pfield,
+          title: 'Observation on Sensor: '+ pfield,
 
       %else:
         title: 'Total Traffic Flow for intersection ${intersection['intersection_number']}',
@@ -383,29 +403,13 @@ var opts = {
 $(document).ready(function() {
   var lat = ${intersection['loc']['coordinates'][1]},
       lng = ${intersection['loc']['coordinates'][0]};
-  var map;
-  // Create a map object and specify the DOM element for display.
-  map = new GMaps({
-    lat: lat,
-    lng: lng,
-    div: '#map',
-    zoom: 15
-  });
+
    var mainMarker = {
     lat: lat,
     lng: lng,
     title: '${intersection['intersection_number']}'
   };
-  map.addMarker(mainMarker);
 
-  %for i in intersection['neighbours']:
-    map.addMarker({
-         lat: ${i['loc']['coordinates'][1]},
-         lng: ${i['loc']['coordinates'][0]},
-         title: '${i['intersection_number']}',
-         infoWindow:{content: '<a href="/intersection/'+${i['intersection_number']}+'">'+${i['intersection_number']}+'</a>'}
-    });
-  %endfor
   var mapCrash = new GMaps({
     lat: lat,
     lng: lng,
@@ -413,7 +417,15 @@ $(document).ready(function() {
     zoom: 15
   });
   mapCrash.addMarker(mainMarker);
-  mapCrash.drawCircle({lat:lat,lng:lng,radius:100,
+  %for i in intersection['neighbours']:
+    mapCrash.addMarker({
+         lat: ${i['loc']['coordinates'][1]},
+         lng: ${i['loc']['coordinates'][0]},
+         title: '${i['intersection_number']}',
+         infoWindow:{content: '<a href="/intersection/'+${i['intersection_number']}+'">'+${i['intersection_number']}+'</a>'}
+    });
+  %endfor
+  mapCrash.drawCircle({lat:lat,lng:lng,radius:${radius},
         editable: false,
         fillColor: '#004de8',
         fillOpacity: 0.27,
@@ -424,21 +436,13 @@ $(document).ready(function() {
   $.each(incidents, function(){
 
       var windowStr = 'Yep';
-      mapCrash.addMarker({
+      var m = mapCrash.addMarker({
         lat: this.loc['coordinates'][1],
         lng: this.loc['coordinates'][0],
         infoWindow: windowStr,
-        icon: {
-            path: fontawesome.markers.EXCLAMATION_CIRCLE,
-            scale: 0.5,
-            strokeWeight: 0.2,
-            strokeColor: 'black',
-            strokeOpacity: 1,
-            fillColor: '#B71C1C',
-            fillOpacity: 1,
-           },
-
+        icon: markerIcon(false),
       });
+      crashMarkers.push(m);
   });
   function toggleChevron(e) {
       $(e.target)
@@ -451,7 +455,7 @@ $(document).ready(function() {
 
   $('.sensor-swapper').click(function() {
      var s = $(this).text();
-     predictionChart.updateOptions( { 'file': pData(s) , 'title': 'Prediction and Observation on Sensor: '+s});
+     predictionChart.updateOptions( { 'file': pData(s) , 'title': 'Observation on Sensor: '+s});
      $('#sensor-label').html('Sensor: '+s+' <b class="caret"></b>');
      anomalyChart.updateOptions( { 'file': aData(s) });
   });

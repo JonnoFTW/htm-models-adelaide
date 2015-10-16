@@ -119,7 +119,7 @@ def get_accident_near(time_start, time_end, intersection, radius=150):
                 '$gte': time_start, #timestamp - delta,
                 '$lte': time_end #timestamp + delta
             }
-        }))
+        }).sort('datetime', pymongo.ASCENDING)), radius
 
 
 def get_anomaly_scores(from_date=None, to_date=None, intersection='3001', anomaly_threshold=None):
@@ -338,11 +338,13 @@ def show_intersection(request):
         intersection['sensors'] = intersection['sensors']
     except:
         intersection['sensors'] = 'Unknown'
+    incidents, radius = get_accident_near(time_start, time_end, intersection['intersection_number'])
     return render_to_response(
         'views/intersection.mak',
         {'intersection': intersection,
          'scores': anomaly_score,
-         'incidents': get_accident_near(time_start, time_end, intersection['intersection_number'])
+         'incidents': incidents,
+         'radius': radius
          },
         request=request
     )

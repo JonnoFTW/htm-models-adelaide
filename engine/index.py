@@ -1,7 +1,9 @@
 #!/usr/bin/env python2.7
+from Queue import Empty
 from collections import Counter
 from datetime import timedelta
 from multiprocessing import Pool
+import multiprocessing
 import sys
 import argparse
 import importlib
@@ -149,8 +151,9 @@ def create_single_sensor_model(sensor, intersection):
         model_params['modelParams']['sensorParams']['encoders'][i['name']] = i
     model = ModelFactory.create(model_params)
     model.enableInference({'predictedField': sensor})
-    print "Creating model for {}:{} in {}s".format(intersection, sensor, time.time() - start)
+  #  print "Creating model for {}:{} in {}s on pid {}".format(intersection, sensor, time.time() - start, os.getpid())
     return model
+
 
 def setup_location_sensors(intersection):
     with pymongo.MongoClient(mongo_uri) as client:
@@ -184,7 +187,7 @@ def getModelParamsFromName(intersection):
     :return: OPF Model params dictionary
     """
     importName = "%s.model_params_%s" % (MODEL_PARAMS_DIR, intersection)
-    print "Importing model params from %s" % importName
+    # print "Importing model params from %s" % importName
     try:
         importedModelParams = importlib.import_module(importName).MODEL_PARAMS
     except ImportError:
@@ -197,16 +200,49 @@ def get_encoders(model):
     return set([i.name for i in model._getSensorRegion().getSelf().encoder.getEncoderList()])
 
 
+class Worker(multiprocessing.Process):
+    def __init__(self, sensor, intersection):
+        super(Worker, self).__init__()
+        self.queue_in = multiprocessing.Queue()
+        self.queue_out = multiprocessing.Queue()
+        self.done = False
+        self.sensor = sensor
+        self.intersection = intersection
+
+    def run(self):
+        anomaly_likelihood_helper = anomaly_likelihood.AnomalyLikelihood(50, 50)
+        model = create_single_sensor_model(self.sensor, self.intersection)
+        while not self.done:
+            try:
+                val = self.queue_in.get(True, 1)
+            except Empty:
+                continue
+            result = model.run(val)
+            prediction = result.inferences["multiStepBestPredictions"][1]
+            anomaly_score = result.inferences["anomalyScore"]
+            likelihood = anomaly_likelihood_helper.anomalyProbability(
+                val[self.sensor], anomaly_score, val['timestamp'])
+            self.queue_out.put((self.sensor, prediction, anomaly_score, likelihood))
+        # could probably serialize the model here
+
+    def finish(self):
+        self.done = True
+
+
 def process_readings(readings, intersection, write_anomaly, collection, progress=True, multi_model=False):
     counter = 0
     total = readings.count(True)
-    anomaly_likelihood_helper = anomaly_likelihood.AnomalyLikelihood(1000, 200)
+
     if multi_model:
         with pymongo.MongoClient(mongo_uri) as client:
             loc = client[mongo_database]['locations'].find_one({'intersection_number': intersection})
-        models = {sensor: create_single_sensor_model(sensor, intersection) for sensor in loc['sensors']}
+        models = {}
+        for sensor in loc['sensors']:
+            models[sensor] = Worker(sensor, intersection)
+            models[sensor].start()
     else:
         model = createModel(intersection)
+        anomaly_likelihood_helper = anomaly_likelihood.AnomalyLikelihood(1000, 200)
         if model is None:
             print "No model could be made for intersection", intersection
             return
@@ -223,16 +259,14 @@ def process_readings(readings, intersection, write_anomaly, collection, progress
 
         if multi_model:
             predictions, anomalies = {}, {}
-            # each sensor should probably be in its own process...
-            for sensor, model in models.iteritems():
+            for sensor, proc in models.iteritems():
                 fields = {"timestamp": timestamp, sensor: i['readings'][sensor]}
-                result = model.run(fields)
-                prediction = result.inferences["multiStepBestPredictions"][1]
-                anomaly_score = result.inferences["anomalyScore"]
-                likelihood = anomaly_likelihood_helper.anomalyProbability(
-                    i['readings'][sensor], anomaly_score, timestamp)
-                predictions[sensor] = prediction
-                anomalies[sensor] = {'score': anomaly_score, 'likelihood': likelihood}
+                proc.queue_in.put(fields)
+            for sensor, proc in models.iteritems():
+                result = proc.queue_out.get()
+                # (self.sensor, prediction, anomaly_score, likelihood)
+                anomalies[result[0]] = {'score': result[2], 'likelihood': result[3]}
+                predictions[result[0]] = result[1]
         else:
             fields = {"timestamp": timestamp}
             for p, j in enumerate(i['readings'].items()):
@@ -251,10 +285,15 @@ def process_readings(readings, intersection, write_anomaly, collection, progress
             anomalies = {pfield: {'score': anomaly_score, 'likelihood': likelihood}}
         if write_anomaly:
             write_anomaly_out(i, anomalies, predictions, collection)
+    if multi_model:
+        for proc in models.values():
+            proc.terminate()
+    else:
+        save_model(model, intersection)
     if progress:
         print
     print "Read", counter, "lines"
-    save_model(model, intersection)
+
 
 
 def write_anomaly_out(doc, anomalies, predictions, collection):
@@ -288,7 +327,7 @@ def run_single_intersection(args):
         query = {'site_no': intersection}
         if incomplete:
             query['anomaly'] = {'$exists': False}
-        readings = collection.find(query).sort('datetime', pymongo.ASCENDING)
+        readings = collection.find(query, no_cursor_timeout=True).sort('datetime', pymongo.ASCENDING)
         if readings.count(True) == 0:
             print "No readings for intersection {}".format(intersection)
             return

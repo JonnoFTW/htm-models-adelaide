@@ -106,7 +106,7 @@ is_rank = 'highest' in report
                             <th>Volume</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="report-table">
                         % for k,v in data:
                         <tr>
                             <td>${k.strftime('%A %d, %B %Y')}</td>
@@ -150,8 +150,12 @@ if (data.length ==0) {
             color: "red",
             strokeWidth: 2.0,
         },
+      highlightCallback: function(event, x, point, row, seriesName) {
+          var query = '#report-table > tr:nth-child('+(point[0].idx+1)+')';
+          $(query).addClass('info').siblings().removeClass('info');
 
-     labels: ['UTC', 'volume'],
+      },
+      labels: ['UTC', 'volume'],
       <%include file="dygraph_weekend.js"/>
 
     });
