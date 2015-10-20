@@ -109,18 +109,21 @@ def get_accident_near(time_start, time_end, intersection, radius=150):
         location = locations.find_one({'intersection_number': intersection})
         # timestamp = datetime.utcfromtimestamp(float(time))
         # delta = timedelta(minutes=30)
-        return list(crashes.find({
+        query = {
             'loc': {
                 '$geoNear': {
                    '$geometry': location['loc'],
-                    '$maxDistance': radius
+                   '$maxDistance': radius
                 }
             },
-            'datetime': {
+        }
+        if time_start is not None:
+            query['datetime'] = {
                 '$gte': time_start, #timestamp - delta,
                 '$lte': time_end #timestamp + delta
             }
-        }).sort('datetime', pymongo.ASCENDING)), radius
+
+        return list(crashes.find(query).sort('datetime', pymongo.ASCENDING)), radius
 
 
 def get_anomaly_scores(from_date=None, to_date=None, intersection='3001', anomaly_threshold=None):
@@ -333,8 +336,12 @@ def show_intersection(request):
     intersection['neighbours'] = _get_neighbours(site)
 
     anomaly_score = list(get_anomaly_scores(intersection=site))
-    time_start = anomaly_score[0]['datetime']
-    time_end = anomaly_score[-1]['datetime']
+    if len(anomaly_score) == 0:
+        time_start = None
+        time_end = None
+    else:
+        time_start = anomaly_score[0]['datetime']
+        time_end = anomaly_score[-1]['datetime']
     try:
         intersection['sensors'] = intersection['sensors']
     except:
@@ -351,15 +358,22 @@ def show_intersection(request):
     )
 
 
+def du(unix):
+    return datetime.utcfromtimestamp(float(unix))
+
 def get_accident_near_json(request):
     args = request.matchdict
-    intersection, time_start, time_end = args['intersection'], args['time_start'], args['time_end']
-    radius = args['radius']
+    intersection, time_start, time_end = args['intersection'], du(args['time_start']), du(args['time_end'])
+    radius = int(args['radius'])
     return get_accident_near(time_start, time_end, intersection, radius)
+
+
 
 def main(global_config, **settings):
     config = Configurator()
     config.include('pyramid_mako')
+    config.add_renderer('bson', 'htmsite.renderers.BSONRenderer')
+
     config.add_route('map', '/')
     config.add_view(show_map, route_name='map')
     config.add_route('intersection', '/intersection/{site_no}')
@@ -371,7 +385,7 @@ def main(global_config, **settings):
     config.add_route('intersections', '/intersections')
     config.add_route('reports', '/reports/{intersection}/{report}')
     config.add_route('accidents', '/accidents/{intersection}/{time_start}/{time_end}/{radius}')
-    config.add_view(get_accident_near_json, route_name='accidents', renderer='json')
+    config.add_view(get_accident_near_json, route_name='accidents', renderer='bson')
     config.add_view(show_report, route_name='reports')
     config.add_view(list_intersections, route_name='intersections')
     config.add_static_view(name='assets', path='assets', cache_max_age=3600)

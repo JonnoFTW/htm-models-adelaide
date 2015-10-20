@@ -22,8 +22,12 @@ import json
 
 <%
 pfield = str(intersection['sensors'][0])
-popular_sensors = map(int,intersection['sensors'])
-intersection['sensors'] = sorted(map(int,intersection['sensors']))
+if isinstance(intersection['sensors'], basestring):
+ popular_sensors = []
+ intersection['sensors'] = []
+else:
+ popular_sensors = map(int,intersection['sensors'])
+ intersection['sensors'] = sorted(map(int,intersection['sensors']))
 has_anything = len(scores) > 0
 del intersection['_id']
 %>
@@ -158,18 +162,7 @@ del intersection['_id']
                         <th>Total Damage</th>
                         </tr>
                     </thead>
-                    <tbody id='incidents'>
-                        % for i in incidents:
-                        <tr>
-                            <td>${i['datetime']}</td>
-                            <td>${i['App_Error']}</td>
-                            <td>${i['Total_Vehicles_Involved']}</td>
-                            <td>${i['Weather_Cond']} - ${i['Moisture_Cond']}</td>
-                            <td>${i['Crash_Type']}</td>
-                            <td>${i['Involves_4WD']}</td>
-                            <td>${i['Total_Damage']}</td>
-                        </tr>
-                        % endfor
+                    <tbody id='incidents-table'>
                     </tbody>
                 </table>
             </div>
@@ -178,6 +171,15 @@ del intersection['_id']
             <div class="panel panel-default">
                 <div class="panel-heading">
                     <i class="fa fa-map fa-fw"></i> Nearby Accidents
+                     <div class="dropdown pull-right">
+                         <a href="#" class="dropdown-toggle" data-toggle="dropdown" id="radius-label">Radius: ${radius}m<b class="caret"></b></a>
+
+                         <ul class="dropdown-menu" role="menu" aria-labelledby="radius-label">
+                            %for i in [50,100,150,250,300]:
+                                <li><a  class="radius-swapper">${i}</a></li>
+                            %endfor
+                         </ul>
+                     </div>
                 </div>
                 <div class="panel-body">
                     <div style="height:600px" id="map-incident"></div>
@@ -190,6 +192,7 @@ del intersection['_id']
 <script type="text/javascript">
 var None = null;
 var incidents = ${json.dumps(incidents,default=json_util.default)|n};
+var radius = ${radius};
 var pfield = '${pfield}';
 %if has_anything:
 var allData = ${json.dumps(scores,default=json_util.default)|n};
@@ -234,7 +237,7 @@ var pData = function(sensor) {
     });
     return array;
 };
-var crashMarkers = [];
+
 var zoomGraph = function(graph, min, max) {
     if(graph)
     graph.updateOptions({
@@ -248,21 +251,8 @@ var highlightX = function(graph, row) {
 // highlight the ith incident in the map
 // and on the table
 
-var crashDefault = '#B71C1C';
-var crashSelected = '#D9EDF7';
-var markerIcon = function(selected) {
-    return {
-            path: fontawesome.markers.EXCLAMATION_CIRCLE,
-            scale: 0.5,
-            strokeWeight: 0.2,
-            strokeColor: 'black',
-            strokeOpacity: 1,
-            fillColor: selected?crashSelected:crashDefault,
-            fillOpacity: 1,
-           };
-};
 var highlightAccident = function(idx) {
-    var query = '#incidents > tr:nth-child('+idx+')';
+    var query = '#incidents-table > tr:nth-child('+idx+')';
     $(query).addClass('info').siblings().removeClass('info');
     $.each(crashMarkers, function(index, obj){
         obj.setIcon(markerIcon(index==idx));
@@ -367,11 +357,10 @@ $('input[name="daterange"]').daterangepicker({
              'intersection': '${intersection['intersection_number']}'
         },
         function(data) {
-            var newData = []
-            $.each(data, function(key, value) {
-                newData.append({});
-            });
-           // anomalyChart.setData(newData);
+            allData = data;
+            predictionChart.updateOptions( { 'file': pData(pfield)});
+            anomalyChart.updateOptions( { 'file': aData(pfield)});
+            updateIncidents($().text().split(' '));
             loader.hide();
         }).
         fail(function(){ loader.hide();});
@@ -391,50 +380,23 @@ var opts = {
   }
 };
 %endif
+var mapCrash;
+var lat, lng;
+
 $(document).ready(function() {
-  var lat = ${intersection['loc']['coordinates'][1]},
-      lng = ${intersection['loc']['coordinates'][0]};
 
-   var mainMarker = {
-    lat: lat,
-    lng: lng,
-    title: '${intersection['intersection_number']}'
-  };
+   lat = ${intersection['loc']['coordinates'][1]};
+   lng = ${intersection['loc']['coordinates'][0]};
 
-  var mapCrash = new GMaps({
+
+  mapCrash = new GMaps({
     lat: lat,
     lng: lng,
     div: '#map-incident',
     zoom: 15
   });
-  mapCrash.addMarker(mainMarker);
-  %for i in intersection['neighbours']:
-    mapCrash.addMarker({
-         lat: ${i['loc']['coordinates'][1]},
-         lng: ${i['loc']['coordinates'][0]},
-         title: '${i['intersection_number']}',
-         infoWindow:{content: '<a href="/intersection/'+${i['intersection_number']}+'">'+${i['intersection_number']}+'</a>'}
-    });
-  %endfor
-  mapCrash.drawCircle({lat:lat,lng:lng,radius:${radius},
-        editable: false,
-        fillColor: '#004de8',
-        fillOpacity: 0.27,
-        strokeColor: '#004de8',
-        strokeOpacity: 0.62,
-        strokeWeight: 1
-  });
-  $.each(incidents, function(){
 
-      var windowStr = 'Yep';
-      var m = mapCrash.addMarker({
-        lat: this.loc['coordinates'][1],
-        lng: this.loc['coordinates'][0],
-        infoWindow: windowStr,
-        icon: markerIcon(false),
-      });
-      crashMarkers.push(m);
-  });
+  setupIncidents(radius);
   function toggleChevron(e) {
       $(e.target)
         .parent()
@@ -446,12 +408,103 @@ $(document).ready(function() {
 
   $('.sensor-swapper').click(function() {
      var s = $(this).text();
+     pfield = s;
      predictionChart.updateOptions( { 'file': pData(s) , 'title': 'Observation on Sensor: '+s});
      $('#sensor-label').html('Sensor: '+s+' <b class="caret"></b>');
      anomalyChart.updateOptions( { 'file': aData(s) });
   });
+   $('.radius-swapper').click(function() {
+      var radius = $(this).text();
+      $('#radius-label').html('Radius: '+radius+'m <b class="caret"></b>');
+      updateIncidents(radius);
+  });
 });
+var mapCircle = null;
+var setupIncidents = function(newRadius) {
+    radius = newRadius;
+ var mainMarker = {
+    lat: lat,
+    lng: lng,
+    title: '${intersection['intersection_number']}'
+  };
+  mapCrash.removeMarkers();
+  mapCrash.addMarker(mainMarker);
+  %for i in intersection['neighbours']:
+    mapCrash.addMarker({
+         lat: ${i['loc']['coordinates'][1]},
+         lng: ${i['loc']['coordinates'][0]},
+         title: '${i['intersection_number']}',
+         infoWindow:{content: '<a href="/intersection/'+${i['intersection_number']}+'">'+${i['intersection_number']}+'</a>'}
+    });
+  %endfor
+  if (mapCircle != null) {
+    mapCircle.setRadius(radius);
+    }
+  else {
+   mapCircle = mapCrash.drawCircle({
+        lat:lat,
+        lng:lng,
+        radius: radius,
+        editable: false,
+        fillColor: '#004de8',
+        fillOpacity: 0.27,
+        strokeColor: '#004de8',
+        strokeOpacity: 0.62,
+        strokeWeight: 1
 
+  });
+  }
+    $.each(incidents, function(){
+
+      var windowStr = 'Yep';
+      var m = mapCrash.addMarker({
+        lat: this.loc['coordinates'][1],
+        lng: this.loc['coordinates'][0],
+        infoWindow: windowStr,
+        icon: markerIcon(false),
+      });
+      crashMarkers.push(m);
+  });
+
+  // populate the table and the anomalychart
+  $('#incidents-table').empty();
+  $.each(incidents, function(idx1, value) {
+    var row = $('<tr></tr>');
+    $.each(['datetime','App_Error','Total_Vehicles_Involved',
+        'Weather_Cond - Moisture_Cond', 'Crash_Type', 'Involves_4WD', 'Total_Damage'],function(idx2, field) {
+
+        row.append('<td>'+ _.map(field.split('-'), function(x){if(x=='datetime')return moment.utc(value[x]['$date']).format('LLLL');else return value[x.trim()];}).join(' - ') +'</td>');
+    });
+    $('#incidents-table').append(row);
+  });
+  anomalyChart.updateOptions( { 'file': aData(pfield)});
+
+};
+var updateIncidents = function(radius) {
+    var start = $('input[name="daterange"]').data('daterangepicker').startDate.unix();
+    var end = $('input[name="daterange"]').data('daterangepicker').endDate.unix();
+    $.getJSON('/accidents/${intersection['intersection_number']}/'+start+'/'+end+'/'+radius, function(data) {
+        // repopulate table and markers
+        incidents = data[0];
+        radius = data[1];
+        setupIncidents(radius);
+    });
+};
+var crashMarkers = [];
+var crashDefault = '#B71C1C';
+var crashSelected = '#D9EDF7';
+
+var markerIcon = function(selected) {
+    return {
+            path: fontawesome.markers.EXCLAMATION_CIRCLE,
+            scale: 0.5,
+            strokeWeight: 0.2,
+            strokeColor: 'black',
+            strokeOpacity: 1,
+            fillColor: selected?crashSelected:crashDefault,
+            fillOpacity: 1,
+           };
+};
 
 </script>
 
