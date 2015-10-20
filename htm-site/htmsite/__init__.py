@@ -28,7 +28,9 @@ def get_site_dir():
     return os.path.dirname(os.path.realpath(__file__))
 
 try:
-    path = os.path.join(os.path.dirname(get_site_dir()), 'connection.yaml')
+    path = os.path.join(os.path.dirname(get_site_dir()), '../connection.yaml')
+    
+    print "looking in path", path
     with open(path, 'r') as f:
         conf = yaml.load(f)
         mongo_uri = conf['mongo_uri']
@@ -36,7 +38,6 @@ try:
         mongo_collection = conf['mongo_collection']
         gmaps_key = conf['GMAPS_API_KEY']
         max_vehicles = conf['max_vehicles']
-
 except:
     raise Exception('No connection.yaml with mongo_uri defined! please make one with a mongo_uri variable')
 
@@ -141,7 +142,7 @@ def get_anomaly_scores(from_date=None, to_date=None, intersection='3001', anomal
             query['datetime']['$lte'] = datetime.strptime(to_date, fmt)
         if anomaly_threshold is not None:
             query['anomaly_score'] = {'$gte': float(anomaly_threshold)}
-        return coll.find(query).sort('datetime', pymongo.ASCENDING)
+        return coll.find(query, {'_id':0,'predictions':0}).sort('datetime', pymongo.ASCENDING)
 
 
 def _get_daily_volume(data, hour=None):
@@ -356,7 +357,7 @@ def get_accident_near_json(request):
     radius = args['radius']
     return get_accident_near(time_start, time_end, intersection, radius)
 
-if __name__ == '__main__':
+def main(global_config, **settings):
     config = Configurator()
     config.include('pyramid_mako')
     config.add_route('map', '/')
@@ -373,10 +374,6 @@ if __name__ == '__main__':
     config.add_view(get_accident_near_json, route_name='accidents', renderer='json')
     config.add_view(show_report, route_name='reports')
     config.add_view(list_intersections, route_name='intersections')
-    config.add_static_view(name='assets', path='assets')
+    config.add_static_view(name='assets', path='assets', cache_max_age=3600)
     config.scan()
-    app = config.make_wsgi_app()
-    host, port = '0.0.0.0', 8080
-    server = make_server(host, port, app)
-    print ("Running on http://{}:{}".format(host, port))
-    server.serve_forever()
+    return config.make_wsgi_app()

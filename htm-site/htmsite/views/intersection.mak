@@ -25,7 +25,6 @@ pfield = str(intersection['sensors'][0])
 popular_sensors = map(int,intersection['sensors'])
 intersection['sensors'] = sorted(map(int,intersection['sensors']))
 has_anything = len(scores) > 0
-has_predictions = has_anything and 'predictions' in scores[1]
 del intersection['_id']
 %>
 
@@ -95,7 +94,6 @@ del intersection['_id']
                 <div class="panel panel-default">
                     <div class="panel-heading">
                         <i class="fa fa-line-chart fa-fw"></i>
-                        %if has_predictions:
                             Observation
                             <div class="dropdown pull-right">
                                 <a href="#" class="dropdown-toggle" data-toggle="dropdown" id="sensor-label">Sensor: ${pfield}<b class="caret"></b></a>
@@ -106,9 +104,7 @@ del intersection['_id']
                                     %endfor
                                 </ul>
                             </div>
-                        %else:
-                            Total Traffic Flow for intersection ${intersection['intersection_number']}
-                        %endif
+
                     </div>
                     <div class="panel-body">
                        <figure style="width: 100%; height: 300px;"  id="prediction-chart"></figure>
@@ -205,7 +201,7 @@ var aData = function(sensor){
         // columns are: date,anomaly, likelihood, incident, incident_predict],
         var row_time = row["datetime"]["$date"];
         if(row['anomalies'] !== undefined) {
-            anomalyCount = _.filter(row['anomalies'],function(n){return n['likelihood'] > 0.9;}).length;
+            anomalyCount = _.filter(row['anomalies'],function(n){return n['likelihood'] > 0.999;}).length;
             array[index] = [new Date(row_time),
                         row['anomalies'][sensor]['score'],
                         row['anomalies'][sensor]['likelihood'],
@@ -333,13 +329,8 @@ if (predictionData.length ==0) {
 } else {
     var predictionChart = new Dygraph(document.getElementById('prediction-chart'), predictionData, {
      labels: ['UTC','Reading'],
+    title: 'Observation on Sensor: '+ pfield,
 
-      %if has_predictions:
-          title: 'Observation on Sensor: '+ pfield,
-
-      %else:
-        title: 'Total Traffic Flow for intersection ${intersection['intersection_number']}',
-      %endif
       ylabel: 'Volume',
       xlabel: 'Date',
       zoomCallback: function(min, max, yRanges) {
