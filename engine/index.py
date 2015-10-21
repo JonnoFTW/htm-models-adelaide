@@ -56,16 +56,18 @@ def getModelDir(intersection):
     return os.path.join(getEngineDir(), MODEL_CACHE_DIR, intersection)
 
 
+client = pymongo.MongoClient(mongo_uri, w=0)
+readings_collection = client[mongo_database][mongo_collection]
+locations_collection = client[mongo_database]['locations']
+
 def get_most_used_sensors(intersection):
-    with pymongo.MongoClient(mongo_uri) as client:
-        collection = client[mongo_database][mongo_collection]
-        records = collection.find({'site_no': intersection})
-        counter = Counter()
-        for i in records:
-            for s, c in i['readings'].items():
-                if c < max_vehicles:
-                    counter[s] += c
-        return counter
+    records = readings_collection.find({'site_no': intersection})
+    counter = Counter()
+    for i in records:
+        for s, c in i['readings'].items():
+            if c < max_vehicles:
+                counter[s] += c
+    return counter
 
 
 def get_sensor_encoder(name):
@@ -121,20 +123,18 @@ def createModel(intersection):
         except:
             return None
         print "Using", pField, "as predictedField for", intersection
-        with pymongo.MongoClient(mongo_uri) as client:
-            collection = client[mongo_database][mongo_collection]
-            doc = collection.find_one({'site_no': intersection})
+        doc = readings_collection.find_one({'site_no': intersection})
 
-            for k in doc['readings']:
-                # don't model unused sensors
-                # could run into errors when the sensor
-                # was damaged for more than the sample period though
-                if sensor_counts[k] == 0 or k != pField:
-                    continue
-                modelParams['modelParams']['sensorParams']['encoders'][k] = get_sensor_encoder(k)
+        for k in doc['readings']:
+            # don't model unused sensors
+            # could run into errors when the sensor
+            # was damaged for more than the sample period though
+            if sensor_counts[k] == 0 or k != pField:
+                continue
+            modelParams['modelParams']['sensorParams']['encoders'][k] = get_sensor_encoder(k)
 
-            for i in get_time_encoders():
-                modelParams['modelParams']['sensorParams']['encoders'][i['name']] = i
+        for i in get_time_encoders():
+            modelParams['modelParams']['sensorParams']['encoders'][i['name']] = i
 
 
         model = ModelFactory.create(modelParams)
@@ -156,28 +156,24 @@ def create_single_sensor_model(sensor, intersection):
 
 
 def setup_location_sensors(intersection):
-    with pymongo.MongoClient(mongo_uri) as client:
-        locations = client[mongo_database]['locations']
-        if not intersection:
-            query = {}
-        else:
-            query = {'intersection_number': {'$in': intersection.split(',')}}
-        for i in locations.find(query):
-            counts = get_most_used_sensors(i['intersection_number']).most_common()
-            if len(counts) == 0:
-                continue
-            locations.update_one({'_id': i['_id']},
-                                 {'$set': {'sensors':
-                                               [i[0] for i in counts if i[1] != 0]
-                                          }})
+    if not intersection:
+        query = {}
+    else:
+        query = {'intersection_number': {'$in': intersection.split(',')}}
+    for i in locations_collection.find(query):
+        counts = get_most_used_sensors(i['intersection_number']).most_common()
+        if len(counts) == 0:
+            continue
+        locations_collection.update_one({'_id': i['_id']},
+                             {'$set': {'sensors':
+                                           [i[0] for i in counts if i[1] != 0]
+                                  }})
 
 
 def getMax():
-    with pymongo.MongoClient(mongo_uri) as client:
-        collection = client[mongo_database][mongo_collection]
-        readings = collection.find()
-        print "Max vehicle count:", max([max(
-            filter(lambda x: x < max_vehicles, i.values())) for i in readings])
+    readings = readings_collection.find()
+    print "Max vehicle count:", max([max(
+        filter(lambda x: x < max_vehicles, i.values())) for i in readings])
 
 def getModelParamsFromName(intersection):
     """
@@ -229,13 +225,13 @@ class Worker(multiprocessing.Process):
         self.done = True
 
 
-def process_readings(readings, intersection, write_anomaly, collection, progress=True, multi_model=False):
+def process_readings(readings, intersection, write_anomaly, progress=True, multi_model=False):
     counter = 0
     total = readings.count(True)
 
     if multi_model:
-        with pymongo.MongoClient(mongo_uri) as client:
-            loc = client[mongo_database]['locations'].find_one({'intersection_number': intersection})
+
+        loc = locations_collection.find_one({'intersection_number': intersection})
         models = {}
         for sensor in loc['sensors']:
             models[sensor] = Worker(sensor, intersection)
@@ -284,7 +280,7 @@ def process_readings(readings, intersection, write_anomaly, collection, progress
                 i['readings'][pfield], anomaly_score, timestamp)
             anomalies = {pfield: {'score': anomaly_score, 'likelihood': likelihood}}
         if write_anomaly:
-            write_anomaly_out(i, anomalies, predictions, collection)
+            write_anomaly_out(i, anomalies, predictions)
     if multi_model:
         for proc in models.values():
             proc.terminate()
@@ -296,13 +292,13 @@ def process_readings(readings, intersection, write_anomaly, collection, progress
 
 
 
-def write_anomaly_out(doc, anomalies, predictions, collection):
-    collection.update_one({"_id": doc["_id"]},
+def write_anomaly_out(doc, anomalies, predictions):
+    readings_collection.update_one({"_id": doc["_id"]},
                           {"$set": {"anomalies": anomalies}})
-    next_doc = collection.find_one({'site_no': doc['site_no'],
+    next_doc = readings_collection.find_one({'site_no': doc['site_no'],
                                    'datetime': doc['datetime'] + timedelta(minutes=5)})
     if next_doc is not None:
-        collection.update_one({'_id': next_doc['_id']},
+        readings_collection.update_one({'_id': next_doc['_id']},
                               {"$set": {"predictions": predictions}})
 
 
@@ -322,42 +318,41 @@ def run_single_intersection(args):
     intersection, write_anomaly, incomplete, show_progress, multi_model = args[0], args[1], args[2], args[3], args[4]
     start_time = time.time()
 
-    with pymongo.MongoClient(mongo_uri) as client:
-        collection = client[mongo_database][mongo_collection]
-        query = {'site_no': intersection}
-        if incomplete:
-            query['anomaly'] = {'$exists': False}
-        readings = collection.find(query, no_cursor_timeout=True).sort('datetime', pymongo.ASCENDING)
-        if readings.count(True) == 0:
-            print "No readings for intersection {}".format(intersection)
-            return
-        process_readings(readings, intersection, write_anomaly, collection, show_progress, multi_model)
+    query = {'site_no': intersection}
+    if incomplete:
+        query['anomaly'] = {'$exists': False}
+    readings = readings_collection.find(query, no_cursor_timeout=True).sort('datetime', pymongo.ASCENDING)
+    if readings.count(True) == 0:
+        print "No readings for intersection {}".format(intersection)
+        return
+    process_readings(readings, intersection, write_anomaly, show_progress, multi_model)
 
     print("Intersection %s complete: --- %s seconds ---" % (intersection, time.time() - start_time))
 
 
-def run_all_intersections(write_anomaly, incomplete, intersections):
+def run_all_intersections(write_anomaly, incomplete, intersections, multi_model=True):
     print "Running all on", os.getpid()
     start_time = time.time()
+    if incomplete:
+        key = '_id'
+        locations = list(readings_collection.aggregate([
+            {'$match': {'anomaly': {'$exists': False}}},
+            {'$group': {'_id': '$site_no'}}
+        ]))
 
-    with pymongo.MongoClient(mongo_uri) as client:
-        collection = client[mongo_database]['locations']
-        if incomplete:
-            key = '_id'
-            locations = list(client[mongo_database][mongo_collection].aggregate([
-                {'$match': {'anomaly': {'$exists': False}}},
-                {'$group': {'_id': '$site_no'}}
-            ]))
-
+    else:
+        key = 'intersection_number'
+        if intersections != '':
+            query = {key: {'$in': intersections.split(',')}}
         else:
-            key = 'intersection_number'
-            if intersections != '':
-                query = {key: {'$in': intersections.split(',')}}
-            else:
-                query = {key:  {'$regex': '3\d\d\d'}}
-            locations = list(collection.find(query))
+            query = {key:  {'$regex': '3\d\d\d'}}
+        locations = list(locations_collection.find(query))
     gen = [(str(l[key]), write_anomaly, incomplete, False) for l in locations]
-    pool = Pool()
+    if multi_model:
+        size = multiprocessing.cpu_count()/2
+    else:
+        size = 8
+    pool = Pool(size)
     pool.map(run_single_intersection, gen)
     print("TOTAL TIME: --- %s seconds ---" % (time.time() - start_time))
 
