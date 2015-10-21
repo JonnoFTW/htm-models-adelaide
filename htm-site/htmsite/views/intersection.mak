@@ -175,7 +175,7 @@ del intersection['_id']
                          <a href="#" class="dropdown-toggle" data-toggle="dropdown" id="radius-label">Radius: ${radius}m<b class="caret"></b></a>
 
                          <ul class="dropdown-menu" role="menu" aria-labelledby="radius-label">
-                            %for i in [50,100,150,250,300]:
+                            %for i in [50,100,150,200,250,300]:
                                 <li><a  class="radius-swapper">${i}</a></li>
                             %endfor
                          </ul>
@@ -255,7 +255,7 @@ var highlightAccident = function(idx) {
     var query = '#incidents-table > tr:nth-child('+idx+')';
     $(query).addClass('info').siblings().removeClass('info');
     $.each(crashMarkers, function(index, obj){
-        obj.setIcon(markerIcon(index==idx));
+        obj.setIcon(markerIcon(index==idx-1));
     });
 };
 var dispFormat = "%d/%m/%y %H:%M";
@@ -317,21 +317,22 @@ if (predictionData.length ==0) {
   There\'s no predictions or readings for this time period. It might not have been analysed yet.\
 </div>').height('0');
 } else {
-    var predictionChart = new Dygraph(document.getElementById('prediction-chart'), predictionData, {
+     var predictionChart = new Dygraph(document.getElementById('prediction-chart'), predictionData, {
      labels: ['UTC','Reading'],
-    title: 'Observation on Sensor: '+ pfield,
+     title: 'Observation on Sensor: '+ pfield,
 
-      ylabel: 'Volume',
-      xlabel: 'Date',
-      zoomCallback: function(min, max, yRanges) {
-            zoomGraph(anomalyChart, min, max);
-      },
-      highlightCallback: function(event, x, point, row, seriesName) {
-          highlightX(anomalyChart, row);
-      },
-      <%include file="dygraph_weekend.js"/>
+     ylabel: 'Volume',
+     xlabel: 'Date',
+     zoomCallback: function(min, max, yRanges) {
+         zoomGraph(anomalyChart, min, max);
+     },
+     highlightCallback: function(event, x, point, row, seriesName) {
+         highlightX(anomalyChart, row);
+     },
+     <%include file="dygraph_weekend.js"/>
     });
 }
+
 <%
 start_title = scores[0]['datetime'].strftime('%d/%m/%Y')
 end_title = scores[-1]['datetime'].strftime('%d/%m/%Y')
@@ -418,6 +419,12 @@ $(document).ready(function() {
       $('#radius-label').html('Radius: '+radius+'m <b class="caret"></b>');
       updateIncidents(radius);
   });
+  $('#incidents-table').on('mouseover', 'tr', function() {
+     var idx = $(this).index();
+     highlightAccident(idx+1);
+     // highlight the one on the chart too
+     anomalyChart.setSelection(incidents[idx]);
+  });
 });
 var mapCircle = null;
 var setupIncidents = function(newRadius) {
@@ -487,6 +494,7 @@ var updateIncidents = function(radius) {
         // repopulate table and markers
         incidents = data[0];
         radius = data[1];
+        crashMarkers = [];
         setupIncidents(radius);
     });
 };

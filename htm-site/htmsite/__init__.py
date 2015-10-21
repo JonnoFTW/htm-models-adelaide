@@ -119,8 +119,8 @@ def get_accident_near(time_start, time_end, intersection, radius=150):
         }
         if time_start is not None:
             query['datetime'] = {
-                '$gte': time_start, #timestamp - delta,
-                '$lte': time_end #timestamp + delta
+                '$gte': time_start,
+                '$lte': time_end
             }
 
         return list(crashes.find(query).sort('datetime', pymongo.ASCENDING)), radius
