@@ -75,6 +75,8 @@ def get_sensor_encoder(name):
             'resolution': 10,
             'n': 400,
             'name': name,
+           # 'minval': 0,
+           # 'maxval': max_vehicles,
             'type': 'RandomDistributedScalarEncoder',
             'w': 21
     }
@@ -86,15 +88,15 @@ def get_time_encoders():
       'name': 'timestamp_timeOfDay',
       'type': 'DateEncoder',
       'timeOfDay': (21, 6)},
-    {
+      {
       'fieldname': 'timestamp',
       'name': 'timestamp_weekend',
       'type': 'DateEncoder',
-      'weekend': (21, 1)}
-       # {'fieldname': 'timestamp',
-       # 'name': 'timestamp_dayOfWeek',
-       # 'type': 'DateEncoder',
-       # 'dayOfWeek': (21, 1)}
+      'weekend': (21, 1)},
+      {'fieldname': 'timestamp',
+       'name': 'timestamp_dayOfWeek',
+       'type': 'DateEncoder',
+       'dayOfWeek': (21, 1)}
     ]
 
 
