@@ -72,12 +72,12 @@ def get_most_used_sensors(intersection):
 
 def get_sensor_encoder(name):
     return {'fieldname': name,
-            'resolution': 10,
+            'resolution': 1,
             'n': 400,
             'name': name,
            # 'minval': 0,
            # 'maxval': max_vehicles,
-            'type': 'RandomDistributedScalarEncoder',
+            'type': 'DeltaEncoder',
             'w': 21
     }
 

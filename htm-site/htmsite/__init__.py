@@ -361,6 +361,7 @@ def show_intersection(request):
 def du(unix):
     return datetime.utcfromtimestamp(float(unix))
 
+
 def get_accident_near_json(request):
     args = request.matchdict
     intersection, time_start, time_end = args['intersection'], du(args['time_start']), du(args['time_end'])
