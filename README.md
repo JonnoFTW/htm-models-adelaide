@@ -78,7 +78,7 @@ some form of prediction.
 
 Usage
 -----
-
+0. Make sure you've got a suitable version of python installed (preferably in a virtualenvironment) with nupic
 1. Import the SCATS data into your mongo instance
    * Make sure you've mongodb installed and in your path
    * Use mongoimport to import the data files (contact me if you really want them since they're private):
@@ -106,7 +106,6 @@ Usage
    * mongo_database: (`string`) mongo database to use
    * mongo_collection: (`string`) mongo collection to get vehicle flow data from
    * GMAPS_API_KEY: (`string`) google maps api key for use with site
-   * pool_size: (`int`) number of cores to use when using parallel processing
    * MODEL_PARAMS_DIR: (`directory`) folder where model params will be stored
    * MODEL_CACHE_DIR: (`directory`) folder where models are serialised to 
    * SWARM_CONFIGS_DIR: (`directory`) folder where swarm configurations are stored
@@ -114,21 +113,37 @@ Usage
 
 3. Run the model using `index.py` and evaluate anomaly results
 
+##### Viewing the results
+
+1. Navigate to `htm-site` folder 
+2. Run `python setup.py develop`
+3. Run the server with `pserve development.ini`
+4. Access the site on http://127.0.0.1:8070
+5. I only have data for the CBD area, so click on a marker and follow the link to see it's information
+6. To go to a specific intersection, use the url: http://127.0.0.1:8070/intersection/3083
+7. You should be able to see anomalies if they've been analysed, along with the raw readings. You can select which sensor
+you want to show for by clicking the dropdown above the readings chart or using the link in the info. The anomaly chart
+shows green points as actual crashes. The orange points are times when the engine thinks an incident has occurred, each
+0.1 increment above zero for the orange points is 1 sensor in an "accident" state.
+8. To zoom in on any chart, just click and drag, to zoom out, double click anywhere on the chart.
+9. To widen the radius used in the crash search, click the radius button and select your range.
+
 ##### Engine Arguments
 
-* `--write-anomaly` : Write the anomaly score back into the document
+* `--write-anomaly` : Write the anomaly score, predictions and anomaly likelihood back into the document
 * `--all`: Run all readings through models in parallel (can you specify a comma separated list of intersections with 
 `--intersection` with this option, eg. `--all --intersection 3001,3002,3085`)
 * `--intersection`:  Name of the intersection(s) to process
 * `--incomplete`: Only process those readings without anomaly values
 * `--popular`: Show the most popular sensor for an intersection
 * `--cache-models`: Attempt to load models from cache and store them to disk
-
+* `--multi-model`: Use one model per sensor for the intersection (as opposed to making a single model that ues each
+ sensor as an input). This mode will take longer and runs each model on a separate process.
 ###### Examples
 
 To run all the data for an intersection against a model do:
 
-`./index.py --intersection 3085 --write-anomaly`
+`./index.py --intersection 3083 --write-anomaly --multi-model`
 
 To run all models in parallel do:
 
