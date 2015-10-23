@@ -80,6 +80,27 @@ Usage
 -----
 
 1. Import the SCATS data into your mongo instance
+   * Make sure you've mongodb installed and in your path
+   * Use mongoimport to import the data files (contact me if you really want them since they're private):
+    Invocation might look like
+    ````
+    mongoimport --db htm_adelaide --collection readings --file readings.json
+    mongoimport --db htm_adelaide --collection crashes --file crashes.json --numInsertionWorkers 3
+    mongoimport --db htm_adelaide --collection locations --file locations.json
+    ````
+
+   * If your instance is not on your machine, you'll need to provide `--host`, `--port`, `--username` and `-password`
+   parameters
+   * For additional information refer to the documentation on [mongo import](https://docs.mongodb.org/v3.0/reference/program/mongoimport/)
+   * Once imported, make sure everything is indexed properly by running from the mongo client `mongo`:
+    ````
+    db.crashes.createIndex({datetime: 1})
+    db.crashes.createIndex({loc: "2dsphere"})
+    db.locations.createIndex({intersection_number: 1})
+    db.locations.createIndex({loc: "2dsphere"})
+    db.readings.createIndex({datetime: 1})
+    db.readings.createIndex({site_no: 1})
+    ````
 2. Create a `connection.yaml` file in the root directory with:
    * mongo_uri: (`string`) mongo connection URI
    * mongo_database: (`string`) mongo database to use
@@ -91,9 +112,7 @@ Usage
    * SWARM_CONFIGS_DIR: (`directory`) folder where swarm configurations are stored
    * max_vehicles: (`int`) highest number of vehicles allowed per time period (200 is a good value)
 
-3. Use `create_swam_config.py` to generate a swarm configuration for the target intersection
-4. Run the swarm using `index.py` to generate the model parameters.
-5. Run the model using `index.py` and evaluate anomaly results
+3. Run the model using `index.py` and evaluate anomaly results
 
 ##### Engine Arguments
 
