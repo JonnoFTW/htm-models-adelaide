@@ -128,6 +128,13 @@ shows green points as actual crashes. The orange points are times when the engin
 8. To zoom in on any chart, just click and drag, to zoom out, double click anywhere on the chart.
 9. To widen the radius used in the crash search, click the radius button and select your range.
 
+##### Don't feel like downloading 20MB pages?
+
+If you're running nginx, you can use it take the output of the webapp, gzip and send it to you which should make
+each page a 1.2MB file. Follow the instructions in [htm-site](https://github.com/JonnoFTW/htm-models-adelaide/tree/master/htm-site) for more.
+
+
+
 ##### Engine Arguments
 
 * `--write-anomaly` : Write the anomaly score, predictions and anomaly likelihood back into the document
@@ -147,7 +154,7 @@ To run all the data for an intersection against a model do:
 
 To run all models in parallel do:
 
-`./index.py --all --write-anomaly
+`./index.py --all --write-anomaly --multi-model`
 
 Results
 -------
