@@ -7,6 +7,7 @@ Installation
 2. Run `python setup.py develop`
 3. Run the server with `pserve development.ini`
 4. Access the site on http://127.0.0.1:8070
+5. If you follow the optional instructions below, you need to access the site on port 8080, ie http://127.0.0.1:8080
 
 Optional nginx setup
 --------------------
