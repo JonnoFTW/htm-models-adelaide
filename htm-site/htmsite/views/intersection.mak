@@ -63,7 +63,7 @@ del intersection['_id']
                                 Lat: ${v['coordinates'][1]}, Lng: ${v['coordinates'][0]}
                             % elif k == 'sensors':
                                 %for sensor in v:
-                                    <a href="#" class="sensor-swapper">${sensor}</a>
+                                    <a href="#observations" class="sensor-swapper">${sensor}</a>
                                 %endfor
                             % else:
                                 ${v}
@@ -94,7 +94,7 @@ del intersection['_id']
     </div>
     % if has_anything:
         <div class="row">
-            <div class="col-lg-12">
+            <div class="col-lg-12" id="observations">
                 <div class="panel panel-default">
                     <div class="panel-heading">
                         <i class="fa fa-line-chart fa-fw"></i>
@@ -104,7 +104,11 @@ del intersection['_id']
 
                                 <ul class="dropdown-menu" role="menu" aria-labelledby="prediction-sensor-menu">
                                     %for sensor in popular_sensors:
-                                        <li><a  class="sensor-swapper">${sensor}</a></li>
+                                        <li
+                                        %if int(sensor) == int(pfield):
+                                            class="active"
+                                        %endif
+                                        ><a  class="sensor-swapper">${sensor}</a></li>
                                     %endfor
                                 </ul>
                             </div>
@@ -191,9 +195,20 @@ del intersection['_id']
 </div>
 <script type="text/javascript">
 var None = null;
+var anomalyChart, predictionChart;
 var incidents = ${json.dumps(incidents,default=json_util.default)|n};
 var radius = ${radius};
 var pfield = '${pfield}';
+// highlight the ith incident in the map
+// and on the table
+
+var highlightAccident = function(idx) {
+    var query = '#incidents-table > tr:nth-child('+idx+')';
+    $(query).addClass('info').siblings().removeClass('info');
+    $.each(crashMarkers, function(index, obj){
+        obj.setIcon(markerIcon(index==idx-1));
+    });
+};
 %if has_anything:
 var allData = ${json.dumps(scores,default=json_util.default)|n};
 
@@ -248,16 +263,7 @@ var highlightX = function(graph, row) {
     if(graph)
         graph.setSelection(row);
 };
-// highlight the ith incident in the map
-// and on the table
 
-var highlightAccident = function(idx) {
-    var query = '#incidents-table > tr:nth-child('+idx+')';
-    $(query).addClass('info').siblings().removeClass('info');
-    $.each(crashMarkers, function(index, obj){
-        obj.setIcon(markerIcon(index==idx-1));
-    });
-};
 var dispFormat = "%d/%m/%y %H:%M";
 var anomalyData = aData(pfield);
 if (anomalyData.length ==0) {
@@ -266,7 +272,7 @@ if (anomalyData.length ==0) {
   There\'s no anomaly values for this time period. It might not have been analysed yet.\
 </div>').height('0');
 } else {
-    var anomalyChart = new Dygraph(document.getElementById('anomaly-chart'), anomalyData, {
+    anomalyChart = new Dygraph(document.getElementById('anomaly-chart'), anomalyData, {
       title: 'Anomaly value for intersection ${intersection['intersection_number']}',
       ylabel: 'Anomaly',
       xlabel: 'Date',
@@ -317,7 +323,7 @@ if (predictionData.length ==0) {
   There\'s no predictions or readings for this time period. It might not have been analysed yet.\
 </div>').height('0');
 } else {
-     var predictionChart = new Dygraph(document.getElementById('prediction-chart'), predictionData, {
+     predictionChart = new Dygraph(document.getElementById('prediction-chart'), predictionData, {
      labels: ['UTC','Reading'],
      title: 'Observation on Sensor: '+ pfield,
 
@@ -412,6 +418,7 @@ $(document).ready(function() {
      pfield = s;
      predictionChart.updateOptions( { 'file': pData(s) , 'title': 'Observation on Sensor: '+s});
      $('#sensor-label').html('Sensor: '+s+' <b class="caret"></b>');
+     $(this).parent().addClass('active').siblings().removeClass('active');
      anomalyChart.updateOptions( { 'file': aData(s) });
   });
    $('.radius-swapper').click(function() {
@@ -421,9 +428,11 @@ $(document).ready(function() {
   });
   $('#incidents-table').on('mouseover', 'tr', function() {
      var idx = $(this).index();
-     highlightAccident(idx+1);
+
+        highlightAccident(idx+1);
      // highlight the one on the chart too
-     anomalyChart.setSelection(incidents[idx]);
+     if(anomalyChart)
+        anomalyChart.setSelection(incidents[idx]);
   });
 });
 var mapCircle = null;
@@ -484,7 +493,8 @@ var setupIncidents = function(newRadius) {
     });
     $('#incidents-table').append(row);
   });
-  anomalyChart.updateOptions( { 'file': aData(pfield)});
+  if(anomalyChart)
+    anomalyChart.updateOptions( { 'file': aData(pfield)});
 
 };
 var updateIncidents = function(radius) {

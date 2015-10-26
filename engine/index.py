@@ -72,12 +72,12 @@ def get_most_used_sensors(intersection):
 
 def get_sensor_encoder(name):
     return {'fieldname': name,
-            'resolution': 1,
-            'n': 400,
+            'resolution': 0.5,
+            'n': 500,
             'name': name,
-           # 'minval': 0,
-           # 'maxval': max_vehicles,
-            'type': 'DeltaEncoder',
+            #'minval': 0,
+            #'maxval': max_vehicles,
+            'type': 'RandomDistributedScalarEncoder',
             'w': 21
     }
 
@@ -87,12 +87,12 @@ def get_time_encoders():
       'fieldname': 'timestamp',
       'name': 'timestamp_timeOfDay',
       'type': 'DateEncoder',
-      'timeOfDay': (21, 6)},
-      {
-      'fieldname': 'timestamp',
-      'name': 'timestamp_weekend',
-      'type': 'DateEncoder',
-      'weekend': (21, 1)},
+      'timeOfDay': (21, 2)},
+      # {
+      # 'fieldname': 'timestamp',
+      # 'name': 'timestamp_weekend',
+      # 'type': 'DateEncoder',
+      # 'weekend': (21, 1)},
       {'fieldname': 'timestamp',
        'name': 'timestamp_dayOfWeek',
        'type': 'DateEncoder',
