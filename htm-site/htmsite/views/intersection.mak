@@ -276,14 +276,11 @@ if (anomalyData.length ==0) {
       title: 'Anomaly value for intersection ${intersection['intersection_number']}',
       ylabel: 'Anomaly',
       xlabel: 'Date',
-      highlightSeriesOpts: { strokeWidth: 3 },
       anomaly: {
             color: "blue",
-            strokeWidth: 2.0,
         },
       likelihood: {
             color: "red",
-            strokeWidth: 2.0,
         },
       incident: {
             color: "green",
@@ -305,11 +302,12 @@ if (anomalyData.length ==0) {
       },
       highlightCallback: function(event, x, point, row, seriesName) {
           highlightX(predictionChart, row);
-
-          if (seriesName === 'incident') {
-          // find idx of point[2] in incidents array
-          // using xval
-            highlightAccident(1+_.findIndex(incidents, function(x){return x["datetime"]["$date"] == point[2].xval;}));
+          if (point[2].yval) {
+              // find idx of point[2] in incidents array
+              // using xval
+            var accidentIdx = 1+_.findIndex(incidents, function(x){return x["datetime"]["$date"] == point[2].xval;});
+            console.log("Moused over", accidentIdx);
+            highlightAccident(accidentIdx);
           }
       },
       labels: ['UTC', 'anomaly', 'likelihood', 'incident', 'incident_predict'],
