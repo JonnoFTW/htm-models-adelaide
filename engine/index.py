@@ -73,33 +73,30 @@ def get_most_used_sensors(intersection):
 
 
 def get_sensor_encoder(name):
-    return {'fieldname': name,
-            'resolution': 0.5,
-            'n': 450,
-            'name': name,
-            #'minval': 0,
-            #'maxval': max_vehicles,
-            'type': 'RandomDistributedScalarEncoder',
-            'w': 21
+    return {
+        'fieldname': name,
+        'name': name,
+        'clipInput': True,
+        'minval': 0.0,
+        'maxval': max_vehicles,
+        'n': 50,
+        'w': 21,
+        'type': 'ScalarEncoder'
     }
 
 
 def get_time_encoders():
     return [{
-      'fieldname': 'timestamp',
-      'name': 'timestamp_timeOfDay',
-      'type': 'DateEncoder',
-      'timeOfDay': (21, 3)},
-      # {
-      # 'fieldname': 'timestamp',
-      # 'name': 'timestamp_weekend',
-      # 'type': 'DateEncoder',
-      # 'weekend': (21, 1)},
-      {'fieldname': 'timestamp',
-       'name': 'timestamp_dayOfWeek',
-       'type': 'DateEncoder',
-       'dayOfWeek': (21, 1)}
-    ]
+        'fieldname': u'timestamp',
+        'name': u'timestamp_timeOfDay',
+        'timeOfDay': (21, 9.5),
+        'type': 'DateEncoder'
+    }, {
+        'fieldname': 'timestamp',
+        'name': 'timestamp_dayOfWeek',
+        'type': 'DateEncoder',
+        'dayOfWeek': (21, 1)
+    }]
 
 
 def createModel(intersection):
@@ -216,6 +213,9 @@ class Worker(multiprocessing.Process):
             try:
                 val = self.queue_in.get(True, 1)
             except Empty:
+                continue
+            # Not sure why I needed to check this:
+            if val[self.sensor] is None:
                 continue
             result = model.run(val)
             prediction = result.inferences["multiStepBestPredictions"][1]
