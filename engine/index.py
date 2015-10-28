@@ -214,14 +214,15 @@ class Worker(multiprocessing.Process):
                 val = self.queue_in.get(True, 1)
             except Empty:
                 continue
-            # Not sure why I needed to check this:
-            if val[self.sensor] is None:
-                continue
+
             result = model.run(val)
             prediction = result.inferences["multiStepBestPredictions"][1]
             anomaly_score = result.inferences["anomalyScore"]
-            likelihood = anomaly_likelihood_helper.anomalyProbability(
-                val[self.sensor], anomaly_score, val['timestamp'])
+            if val[self.sensor] is None:
+                likelihood = None
+            else:
+                likelihood = anomaly_likelihood_helper.anomalyProbability(
+                    val[self.sensor], anomaly_score, val['timestamp'])
             self.queue_out.put((self.sensor, prediction, anomaly_score, likelihood))
         # could probably serialize the model here
 
