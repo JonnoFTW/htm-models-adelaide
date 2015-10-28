@@ -207,7 +207,7 @@ class Worker(multiprocessing.Process):
         self.intersection = intersection
 
     def run(self):
-        anomaly_likelihood_helper = anomaly_likelihood.AnomalyLikelihood(50, 50)
+        anomaly_likelihood_helper = anomaly_likelihood.AnomalyLikelihood(200, 200, reestimationPeriod=10)
         model = create_single_sensor_model(self.sensor, self.intersection)
         while not self.done:
             try:
