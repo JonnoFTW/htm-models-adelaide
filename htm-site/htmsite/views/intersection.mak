@@ -219,10 +219,11 @@ var aData = function(sensor){
         // columns are: date,anomaly, likelihood, incident, incident_predict],
         var row_time = row["datetime"]["$date"];
         if(row['anomalies'] !== undefined) {
-            anomalyCount = _.filter(row['anomalies'],function(n){return n['likelihood'] > 0.999;}).length;
+            anomalyCount = _.filter(row['anomalies'],function(n){return n['likelihood'] > 0.96;}).length;
             array[index] = [new Date(row_time),
                         row['anomalies'][sensor]['score'],
                         row['anomalies'][sensor]['likelihood'],
+                       // Math.log(1.0 - row['anomalies'][sensor]['likelihood'])/ -23.02585084720009,
                         _.find(incidents,function(n){return n['datetime']['$date'] == row_time;})?1.1:null,
                          anomalyCount > 2?anomalyCount/10.0:null
                        ];

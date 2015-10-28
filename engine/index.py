@@ -1,6 +1,6 @@
 #!/usr/bin/env python2.7
 from Queue import Empty
-from collections import Counter
+from collections import Counter, deque
 from datetime import timedelta
 from multiprocessing import Pool
 import multiprocessing.pool
@@ -10,6 +10,8 @@ import argparse
 import importlib
 import os
 import time
+import numpy
+from pluck import pluck
 import pymongo
 import pyprind
 import yaml
@@ -232,7 +234,7 @@ class Worker(multiprocessing.Process):
         self.done = True
 
 
-def process_readings(readings, intersection, write_anomaly, progress=True, multi_model=False, smoothing=True):
+def process_readings(readings, intersection, write_anomaly, progress=True, multi_model=False, smoothing=0):
     counter = 0
     total = readings.count(True)
 
@@ -253,7 +255,9 @@ def process_readings(readings, intersection, write_anomaly, progress=True, multi
         encoders = get_encoders(model)
     if progress:
         progBar = pyprind.ProgBar(total, width=50)
-    previous = None
+    _smoothing = smoothing >= 1
+    if _smoothing:
+        previous = deque(maxlen=smoothing)
     for i in readings:
         counter += 1
         if progress:
@@ -266,8 +270,8 @@ def process_readings(readings, intersection, write_anomaly, progress=True, multi
                 vc = i['readings'][sensor]
                 if vc > max_vehicles:
                     vc = None
-                elif smoothing and previous:
-                    vc = (vc + previous['readings'][sensor])/2.
+                elif _smoothing and len(previous):
+                    vc = (vc + sum(pluck(sensor, previous)))/float(len(previous) + 1)
                 fields = {"timestamp": timestamp, sensor: vc}
                 proc.queue_in.put(fields)
             for sensor, proc in models.iteritems():
@@ -293,8 +297,8 @@ def process_readings(readings, intersection, write_anomaly, progress=True, multi
             anomalies = {pfield: {'score': anomaly_score, 'likelihood': likelihood}}
         if write_anomaly:
             write_anomaly_out(i, anomalies, predictions)
-        if smoothing:
-            previous = dict(i)
+        if _smoothing:
+            previous.append(i['readings'])
     if multi_model:
         for proc in models.values():
             proc.terminate()
@@ -328,8 +332,10 @@ def save_model(model, site_no):
 
 
 def run_single_intersection(args):
-    intersection, write_anomaly, incomplete, show_progress, multi_model, smooth = args[0], args[1], args[2], args[3],\
-                                                                                  args[4], args[5]
+    intersection, write_anomaly, incomplete, \
+     show_progress, multi_model, smooth = args[0], args[1],\
+                     args[2], args[3],\
+                     args[4], args[5]
     start_time = time.time()
 
     query = {'site_no': intersection}
@@ -372,8 +378,22 @@ def run_all_intersections(write_anomaly, incomplete, intersections, multi_model,
     print("TOTAL TIME: --- %s seconds ---" % (time.time() - start_time))
 
 
+def get_data():
+    readings = readings_collection.find({'site_no': '3083'},
+                                        {'datetime': True, 'readings': True}).sort('datetime', pymongo.ASCENDING)
+    data = numpy.empty((readings.count(), 2), dtype=numpy.uint64)
+    c = 0
+    for i in readings:
+        data[c][0] = i['datetime'].strftime("%s")
+        data[c][1] = i['readings']['56']
+        c += 1
+
+    numpy.savetxt('3083_56.csv', data, fmt='%d', delimiter=',')
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=DESCRIPTION)
+    parser.add_argument('--search', help='Perform a parameter search', action='store_true')
     parser.add_argument('--write-anomaly', help="Write the anomaly score back into the document", action='store_true')
     parser.add_argument('--all', help="Run all readings through model", action="store_true")
     parser.add_argument('--intersection', type=str, help="Name of the intersection", default='')
@@ -383,16 +403,19 @@ if __name__ == "__main__":
     parser.add_argument('--setup-sensors', help='store used sensors in locations. Use --intersection to specify '
                                                 'many otherwise it will do all of them', action='store_true')
     parser.add_argument('--multi-model', help="Use a model per sensor", action='store_true')
-    parser.add_argument('--smooth', help="Smooth the readings values using a mean filter with"
-                                        "window size=2", action='store_true')
+    parser.add_argument('--smooth', type=int, help="Smooth the readings values using a mean filter with given size", default=0)
     args = parser.parse_args()
+    if args.search:
+        print "Searching for good encoder params"
+        get_data()
+        sys.exit()
     if args.setup_sensors:
         setup_location_sensors(args.intersection)
         sys.exit()
     CACHE_MODELS = args.cache_models
     setupFolders()
     if args.all:
-        run_all_intersections(args.write_anomaly, args.incomplete, args.intersection, args.multi_model, args)
+        run_all_intersections(args.write_anomaly, args.incomplete, args.intersection, args.multi_model, args.smooth)
     elif args.popular:
         print "Lane usage for ", args.intersection, "is:  "
         for i, j in get_most_used_sensors(args.intersection).most_common():
