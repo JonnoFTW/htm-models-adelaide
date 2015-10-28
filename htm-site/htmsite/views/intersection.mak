@@ -129,6 +129,15 @@ del intersection['_id']
                     <!-- /.panel-heading -->
                     <div class="panel-body">
                        <figure style="width: 100%; height: 300px;"  id="anomaly-chart"></figure>
+                       <form href="" class="form-inline" id="anomaly-params">
+                           <div class="form-group">
+                              <label for="threshold">Threshold</label>
+                              <input type="text" class="form-control" id="threshold-input" placeholder="0.99" value="0.99">
+                           </div>
+                           <div class="checkbox">
+                              <label><input type="checkbox" id="logarithm-input"> Log of likelihood</label>
+                          </div>
+                       </form>
                     </div>
                 </div>
             </div>
@@ -213,17 +222,20 @@ var highlightAccident = function(idx) {
 var allData = ${json.dumps(scores,default=json_util.default)|n};
 
 var aData = function(sensor){
+    var threshold = parseFloat($('#threshold-input').val());
+    var logarithm = $('#logarithm-input').is(':checked');
+    console.log("threshold:", threshold, "log", logarithm);
     //return an array made from all data
-    var array = [];
+    var array = new Array(allData.length);
     allData.forEach(function(row, index, in_array) {
         // columns are: date,anomaly, likelihood, incident, incident_predict],
         var row_time = row["datetime"]["$date"];
         if(row['anomalies'] !== undefined) {
-            anomalyCount = _.filter(row['anomalies'],function(n){return n['likelihood'] > 0.96;}).length;
+            anomalyCount = _.filter(row['anomalies'],function(n){return n['likelihood'] > threshold;}).length;
             array[index] = [new Date(row_time),
                         row['anomalies'][sensor]['score'],
-                        row['anomalies'][sensor]['likelihood'],
-                       // Math.log(1.0 - row['anomalies'][sensor]['likelihood'])/ -23.02585084720009,
+                        !logarithm?row['anomalies'][sensor]['likelihood']:
+                                   Math.log(1.0 - row['anomalies'][sensor]['likelihood'])/ -23.02585084720009,
                         _.find(incidents,function(n){return n['datetime']['$date'] == row_time;})?1.1:null,
                          anomalyCount > 2?anomalyCount/10.0:null
                        ];
@@ -433,6 +445,11 @@ $(document).ready(function() {
      if(anomalyChart)
         anomalyChart.setSelection(incidents[idx]);
   });
+
+  $('#anomaly-params').change(function() {
+    console.log("Anomaly chart params updated");
+    anomalyChart.updateOptions( { 'file': aData(pfield) });
+  }).on('submit',function(ev){ev.preventDefault();});
 });
 var mapCircle = null;
 var setupIncidents = function(newRadius) {
@@ -471,11 +488,11 @@ var setupIncidents = function(newRadius) {
   }
     $.each(incidents, function(){
 
-      var windowStr = 'Yep';
+      var windowStr = '$'+this.Total_Damage;
       var m = mapCrash.addMarker({
         lat: this.loc['coordinates'][1],
         lng: this.loc['coordinates'][0],
-        infoWindow: windowStr,
+        infoWindow: {content:windowStr},
         icon: markerIcon(false),
       });
       crashMarkers.push(m);
