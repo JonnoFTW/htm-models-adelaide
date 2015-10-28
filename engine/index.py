@@ -217,10 +217,12 @@ class Worker(multiprocessing.Process):
 
             result = model.run(val)
             prediction = result.inferences["multiStepBestPredictions"][1]
-            anomaly_score = result.inferences["anomalyScore"]
+
             if val[self.sensor] is None:
+                anomaly_score = None
                 likelihood = None
             else:
+                anomaly_score = result.inferences["anomalyScore"]
                 likelihood = anomaly_likelihood_helper.anomalyProbability(
                     val[self.sensor], anomaly_score, val['timestamp'])
             self.queue_out.put((self.sensor, prediction, anomaly_score, likelihood))
