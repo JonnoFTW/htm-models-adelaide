@@ -94,9 +94,9 @@ del intersection['_id']
     </div>
     % if has_anything:
         <div class="row">
-            <div class="col-lg-12" id="observations">
+            <div class="col-lg-12" >
                 <div class="panel panel-default">
-                    <div class="panel-heading">
+                    <div class="panel-heading" id="observations">
                         <i class="fa fa-line-chart fa-fw"></i>
                             Observation
                             <div class="dropdown pull-right">
@@ -137,7 +137,11 @@ del intersection['_id']
                            <div class="checkbox">
                               <label><input type="checkbox" id="logarithm-input"> Log of likelihood</label>
                           </div>
+                          <div class="form-group">
+                            <label id="anomaly-list-label">High Anomaly at: </label><p id="form-anomalies"></p>
+                          </div>
                        </form>
+                       
                     </div>
                 </div>
             </div>
@@ -231,13 +235,13 @@ var aData = function(sensor){
         // columns are: date,anomaly, likelihood, incident, incident_predict],
         var row_time = row["datetime"]["$date"];
         if(row['anomalies'] !== undefined) {
-            anomalyCount = _.filter(row['anomalies'],function(n){return n['likelihood'] > threshold;}).length;
+            anomalyCount = _.filter(row['anomalies'],function(n){return n['likelihood'] > threshold;}).length ;
             array[index] = [new Date(row_time),
                         row['anomalies'][sensor]['score'],
                         !logarithm?row['anomalies'][sensor]['likelihood']:
                                    Math.log(1.0 - row['anomalies'][sensor]['likelihood'])/ -23.02585084720009,
                         _.find(incidents,function(n){return n['datetime']['$date'] == row_time;})?1.1:null,
-                         anomalyCount > 2?anomalyCount/10.0:null
+                         anomalyCount >= 1 ?anomalyCount/ Object.keys(row['anomalies']).length:null
                        ];
        } else {
             array[index] = [new Date(row_time),null,null
@@ -313,14 +317,28 @@ if (anomalyData.length ==0) {
       zoomCallback: function(min, max, yRanges) {
           zoomGraph(predictionChart, min, max);
       },
-      highlightCallback: function(event, x, point, row, seriesName) {
+      highlightCallback: function(event, x, points, row, seriesName) {
           highlightX(predictionChart, row);
-          if (point[2].yval) {
+          if (points[2].yval) {
               // find idx of point[2] in incidents array
               // using xval
-            var accidentIdx = 1+_.findIndex(incidents, function(x){return x["datetime"]["$date"] == point[2].xval;});
-            console.log("Moused over", accidentIdx);
+            var accidentIdx = 1+_.findIndex(incidents, function(x){return x["datetime"]["$date"] == points[2].xval;});
+            //console.log("Moused over", accidentIdx);
             highlightAccident(accidentIdx);
+          }
+          if (points[3].yval) {
+              $('#anomaly-list-label').text("High Anomaly at "+moment.utc(points[3].xval).format('LLLL'));
+              var threshold = parseFloat($('#threshold-input').val());
+              var sensors = [];
+              _.each(allData[row]['anomalies'], function(val, key) {
+                if(val.likelihood > threshold)
+                    sensors.push(key);    
+              });
+              var anomaly_list = $('p#form-anomalies');
+              anomaly_list.empty();
+              $.each(sensors, function(i, val){
+                  anomaly_list.append('<a href="#observations" class="sensor-swapper">'+val+'</a> ');
+              });
           }
       },
       labels: ['UTC', 'anomaly', 'likelihood', 'incident', 'incident_predict'],
@@ -424,13 +442,13 @@ $(document).ready(function() {
   $('#accordion').on('hidden.bs.collapse', toggleChevron);
   $('#accordion').on('shown.bs.collapse', toggleChevron);
 
-  $('.sensor-swapper').click(function() {
-     var s = $(this).text();
-     pfield = s;
-     predictionChart.updateOptions( { 'file': pData(s) , 'title': 'Observation on Sensor: '+s});
-     $('#sensor-label').html('Sensor: '+s+' <b class="caret"></b>');
+  $('body').on('click', '.sensor-swapper', function() {
+     pfield = $(this).text();
+     console.log('sensor swapping to',pfield);
+     predictionChart.updateOptions( { 'file': pData(pfield) , 'title': 'Observation on Sensor: '+pfield});
+     $('#sensor-label').html('Sensor: '+pfield+' <b class="caret"></b>');
      $(this).parent().addClass('active').siblings().removeClass('active');
-     anomalyChart.updateOptions( { 'file': aData(s) });
+     anomalyChart.updateOptions( { 'file': aData(pfield) });
   });
    $('.radius-swapper').click(function() {
       var radius = $(this).text();
