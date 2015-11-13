@@ -11,7 +11,7 @@ import os
 from pyramid.view import view_config
 import yaml
 import json
-
+from geopy.distance import vincenty
 
 from pyramid.events import subscriber
 from pyramid.events import BeforeRender
@@ -368,7 +368,41 @@ def get_accident_near_json(request):
     radius = int(args['radius'])
     return get_accident_near(time_start, time_end, intersection, radius)
 
-
+def show_incidents(request):
+    """
+    Show the
+    :param request:
+    :return:
+    """
+    from bson import json_util
+    start = datetime.utcfromtimestamp(1367245800)
+    end = datetime.utcfromtimestamp(1372516200)
+    incidents = []
+    # get incidents in this range in CITY OF ADELAIDE lga
+    with _get_mongo_client( ) as client:
+        crashes = client[mongo_database]['crashes']
+        results = crashes.find({'datetime':{'$gte': start, '$lte': end}, 'LGA_Name':'CITY OF ADELAIDE'})
+        # get the readings of the nearest intersection at at the nearest time step
+        td = timedelta(minutes=5)
+        for crash in results:
+            site = client[mongo_database]['locations'].find_one({
+                'loc': {
+                    '$geoNear': {
+                       '$geometry': crash['loc']
+                    }
+                }
+            })
+            readings = client[mongo_database][mongo_collection].find({
+                'datetime': {'$gte': crash['datetime']- td,'$lte': crash['datetime'] + td},
+                'site_no': site['intersection_number']
+            }).limit(3).sort('datetime')
+            incidents.append((crash,list(readings), site, vincenty(site['loc']['coordinates'], crash['loc']['coordinates']).meters))
+  #  print json.dumps(incidents, indent=4, default=json_util.default)
+    return render_to_response(
+        'views/incidents.mak',
+        {'incidents': incidents},
+        request=request
+    )
 
 def main(global_config, **settings):
     config = Configurator()
@@ -389,6 +423,9 @@ def main(global_config, **settings):
     config.add_view(get_accident_near_json, route_name='accidents', renderer='bson')
     config.add_view(show_report, route_name='reports')
     config.add_view(list_intersections, route_name='intersections')
+
+    config.add_route('incidents', '/incidents')
+    config.add_view(show_incidents, route_name='incidents')
     config.add_static_view(name='assets', path='assets', cache_max_age=3600)
     config.scan()
     return config.make_wsgi_app()

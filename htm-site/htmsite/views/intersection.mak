@@ -240,7 +240,7 @@ var aData = function(sensor){
                         row['anomalies'][sensor]['score'],
                         !logarithm?row['anomalies'][sensor]['likelihood']:
                                    Math.log(1.0 - row['anomalies'][sensor]['likelihood'])/ -23.02585084720009,
-                        _.find(incidents,function(n){return n['datetime']['$date'] == row_time;})?1.1:null,
+                        _.find(incidents,function(n){return Math.round(n['datetime']['$date']/300000)*300000 == row_time;})?1.1:null,
                          anomalyCount >= 1 ?anomalyCount/ Object.keys(row['anomalies']).length:null
                        ];
        } else {
@@ -319,10 +319,10 @@ if (anomalyData.length ==0) {
       },
       highlightCallback: function(event, x, points, row, seriesName) {
           highlightX(predictionChart, row);
-          if (points[2].yval) {
+          if (points[2].xval) {
               // find idx of point[2] in incidents array
               // using xval
-            var accidentIdx = 1+_.findIndex(incidents, function(x){return x["datetime"]["$date"] == points[2].xval;});
+            var accidentIdx = 1+_.findIndex(incidents, function(x){return Math.round(x["datetime"]["$date"]/300000)*300000 == points[2].xval;});
             //console.log("Moused over", accidentIdx);
             highlightAccident(accidentIdx);
           }
