@@ -2,6 +2,20 @@ drawPoints: true,
 labelsUTC: true,
 legend: 'always',
 pixelsPerLabel: 40,
+axes: {
+    x: {
+        axisLabelFormatter: function (d, gran, opts) {
+            console.log("gran==",gran);
+            if(gran == Dygraph.DAILY)
+                return moment(d).format('ddd D MMM');
+            else
+                return Dygraph.dateAxisLabelFormatter(d,gran,opts);
+        },
+        valueFormatter: function (ms) {
+            return moment.utc(ms).format('LLLL');
+        }
+    }
+},
 underlayCallback: function(canvas, area, g) {
                         var yellow = "rgba(255, 255, 102, 1.0)";
 

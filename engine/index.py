@@ -90,15 +90,17 @@ def get_sensor_encoder(name):
 def get_time_encoders():
     return [{
         'fieldname': u'timestamp',
-        'name': u'timestamp_timeOfDay',
-        'timeOfDay': (21, 9.5),
+        'name': u'timestamp_hourOfWeek',
+        'hourOfWeek': (168,21),
         'type': 'DateEncoder'
-    }, {
-        'fieldname': 'timestamp',
-        'name': 'timestamp_dayOfWeek',
-        'type': 'DateEncoder',
-        'dayOfWeek': (21, 1)
-    }]
+    }
+   # {
+   #     'fieldname': 'timestamp',
+   #     'name': 'timestamp_dayOfWeek',
+   #     'type': 'DateEncoder',
+   #     'dayOfWeek': (21, 1)
+   # }
+    ]
 
 
 def createModel(intersection):
@@ -168,9 +170,7 @@ def setup_location_sensors(intersection):
         if len(counts) == 0:
             continue
         locations_collection.update_one({'_id': i['_id']},
-                             {'$set': {'sensors':
-                                           [i[0] for i in counts if i[1] != 0]
-                                  }})
+                             {'$set': {'sensors': [i[0] for i in counts if i[1] != 0]}})
 
 
 def getMax():
@@ -263,7 +263,7 @@ def process_readings(readings, intersection, write_anomaly, progress=True, multi
         if progress:
             progBar.update()
         timestamp = i['datetime']
-
+        i['hour_of_week'] = readings['timestamp'].weekday() * 7 + readings['timestamp'].hour
         if multi_model:
             predictions, anomalies = {}, {}
             for sensor, proc in models.iteritems():
