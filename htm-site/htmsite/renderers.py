@@ -14,3 +14,11 @@ class BSONRenderer:
 
     def __call__(self, value, system):
         return json.dumps(value, default=json_util.default)
+
+
+class PymongoCursorRenderer:
+    def __init__(self, info):
+        pass
+
+    def __call__(self, value, system):
+        return '['+(','.join([json.dumps(i,default=json_util.default) for i in value]))+']'

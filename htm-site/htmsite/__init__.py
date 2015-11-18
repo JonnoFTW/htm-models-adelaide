@@ -138,14 +138,15 @@ def get_anomaly_scores(from_date=None, to_date=None, intersection='3001', anomal
         # input is a unix date
         coll = client[mongo_database][mongo_collection]
         query = {'site_no': intersection}
-
+        if from_date or to_date:
+            query['datetime'] = {}
         if from_date is not None:
-            query['datetime']['$gte'] = datetime.strptime(from_date, fmt)
+            query['datetime']['$gte'] = du(from_date)
         if to_date is not None:
-            query['datetime']['$lte'] = datetime.strptime(to_date, fmt)
+            query['datetime']['$lte'] = du(to_date)
         if anomaly_threshold is not None:
             query['anomaly_score'] = {'$gte': float(anomaly_threshold)}
-        return coll.find(query, {'_id':0,'predictions':0}, skip=20000, limit=3000).sort('datetime', pymongo.ASCENDING)
+        return coll.find(query, {'_id':0,'predictions':0}).sort('datetime', pymongo.ASCENDING)
 
 
 def _get_daily_volume(data, hour=None):
@@ -291,8 +292,10 @@ def get_readings_anomaly_json(request):
     :param request:
     :return:
     """
-    args = request.matchdict.GET
-    return list(get_anomaly_scores(args['from'], args['to'], args['intersection']))
+    
+    args = request.matchdict
+    
+    return get_anomaly_scores(request.GET.get('from',None), request.GET.get('to',None), args['intersection'])
 
 
 def intersections_json():
@@ -320,7 +323,6 @@ def list_intersections(request):
 
 def show_intersection(request):
     """
-
     :param request:
     :return:
     """
@@ -335,13 +337,14 @@ def show_intersection(request):
                                   request)
     intersection['neighbours'] = _get_neighbours(site)
 
-    anomaly_score = list(get_anomaly_scores(intersection=site))
-    if len(anomaly_score) == 0:
+    cursor = get_anomaly_scores(intersection=site)
+    anomaly_score_count = cursor.count()
+    if anomaly_score_count == 0:
         time_start = None
         time_end = None
     else:
-        time_start = anomaly_score[0]['datetime']
-        time_end = anomaly_score[-1]['datetime']
+        time_start = cursor[0]['datetime']
+        time_end = cursor[cursor.count()-1]['datetime']
     try:
         intersection['sensors'] = intersection['sensors']
     except:
@@ -350,9 +353,11 @@ def show_intersection(request):
     return render_to_response(
         'views/intersection.mak',
         {'intersection': intersection,
-         'scores': anomaly_score,
+         'scores_count': anomaly_score_count,
          'incidents': incidents,
-         'radius': radius
+         'radius': radius,
+         'time_start': time_start,
+         'time_end': time_end
          },
         request=request
     )
@@ -408,13 +413,13 @@ def main(global_config, **settings):
     config = Configurator()
     config.include('pyramid_mako')
     config.add_renderer('bson', 'htmsite.renderers.BSONRenderer')
-
+    config.add_renderer('pymongo_cursor', 'htmsite.renderers.PymongoCursorRenderer')
     config.add_route('map', '/')
     config.add_view(show_map, route_name='map')
     config.add_route('intersection', '/intersection/{site_no}')
     config.add_route('intersection_json', '/intersections.json')
-    config.add_route('readings_anomaly_json', '/get_readings_anomaly.json')
-    config.add_view(get_readings_anomaly_json, route_name='readings_anomaly_json', renderer='json')
+    config.add_route('readings_anomaly_json', '/get_readings_anomaly_{intersection}.json')
+    config.add_view(get_readings_anomaly_json, route_name='readings_anomaly_json', renderer='pymongo_cursor')
     config.add_view(intersections_json, route_name='intersection_json', renderer='json')
     config.add_view(show_intersection, route_name='intersection')
     config.add_route('intersections', '/intersections')

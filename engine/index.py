@@ -91,7 +91,7 @@ def get_time_encoders():
     return [{
         'fieldname': u'timestamp',
         'name': u'timestamp_hourOfWeek',
-        'hourOfWeek': (168,21),
+        'hourOfWeek': 21,
         'type': 'DateEncoder'
     }
    # {
@@ -263,7 +263,6 @@ def process_readings(readings, intersection, write_anomaly, progress=True, multi
         if progress:
             progBar.update()
         timestamp = i['datetime']
-        i['hour_of_week'] = readings['timestamp'].weekday() * 7 + readings['timestamp'].hour
         if multi_model:
             predictions, anomalies = {}, {}
             for sensor, proc in models.iteritems():

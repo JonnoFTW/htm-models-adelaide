@@ -28,7 +28,7 @@ if isinstance(intersection['sensors'], basestring):
 else:
  popular_sensors = map(int,intersection['sensors'])
  intersection['sensors'] = sorted(map(int,intersection['sensors']))
-has_anything = len(scores) > 0
+has_anything = scores_count > 0
 del intersection['_id']
 %>
 
@@ -98,7 +98,7 @@ del intersection['_id']
                 <div class="panel panel-default">
                     <div class="panel-heading" id="observations">
                         <i class="fa fa-line-chart fa-fw"></i>
-                            Observation
+                            Observation <i class="fa fa-spinner fa-pulse loaderImage" ></i>
                             <div class="dropdown pull-right">
                                 <a href="#" class="dropdown-toggle" data-toggle="dropdown" id="sensor-label">Sensor: ${pfield}<b class="caret"></b></a>
 
@@ -124,7 +124,7 @@ del intersection['_id']
             <div class="col-lg-12">
                 <div class="panel panel-default">
                     <div class="panel-heading">
-                        <i class="fa fa-line-chart fa-fw"></i> Anomaly Scores
+                        <i class="fa fa-line-chart fa-fw"></i> Anomaly Scores <i class="fa fa-spinner fa-pulse loaderImage"></i>
                     </div>
                     <!-- /.panel-heading -->
                     <div class="panel-body">
@@ -208,6 +208,8 @@ del intersection['_id']
 </div>
 <script type="text/javascript">
 var None = null;
+var True = true;
+var False = false;
 var anomalyChart, predictionChart;
 var incidents = ${json.dumps(incidents,default=json_util.default)|n};
 var radius = ${radius};
@@ -223,20 +225,49 @@ var highlightAccident = function(idx) {
     });
 };
 %if has_anything:
-var allData = ${json.dumps(scores,default=json_util.default)|n};
+var allData;
 
-var aData = function(sensor){
+var hideLoader = function() {
+    $('.loaderImage').hide();
+};
+var loadData = function(from,to, callback) {
+    console.log("Loading data from json");
+    var args =  {
+            'from': from,
+             'to': to,
+    };
+    $.getJSON( '/get_readings_anomaly_${intersection['intersection_number']}.json', args,
+        function(data) {
+            allData = data;
+            if(callback)
+                callback(); 
+            hideLoader();
+        }).
+        fail(function(){ hideLoader();});
+};
+var makeAnomalyReadingArrays = function(sensor, only) {
     var threshold = parseFloat($('#threshold-input').val());
     var logarithm = $('#logarithm-input').is(':checked');
     console.log("threshold:", threshold, "log", logarithm);
     //return an array made from all data
-    var array = new Array(allData.length);
+    var aData = new Array(allData.length);
+    var pData = new Array(allData.length);
+    var out;
+    if (only == 'anomaly')
+       out = {'aData': aData};
+    else if(only == 'readings')
+        out = {'pData': pData};
+    else
+        out = {'aData': aData, 'pData': pData};
     allData.forEach(function(row, index, in_array) {
         // columns are: date,anomaly, likelihood, incident, incident_predict],
+        
         var row_time = row["datetime"]["$date"];
-        if(row['anomalies'] !== undefined) {
+        if(only != 'anomaly')
+            pData[index] = [new Date(row_time), row['readings'][sensor] < ${max_vehicles}?row['readings'][sensor]:null];
+        if(row['anomalies'] !== undefined && only != 'readings') {
             anomalyCount = _.filter(row['anomalies'],function(n){return n['likelihood'] > threshold;}).length ;
-            array[index] = [new Date(row_time),
+            aData[index] = [new Date(row_time),
                         row['anomalies'][sensor]['score'],
                         !logarithm?row['anomalies'][sensor]['likelihood']:
                                    Math.log(1.0 - row['anomalies'][sensor]['likelihood'])/ -23.02585084720009,
@@ -244,32 +275,107 @@ var aData = function(sensor){
                          anomalyCount >= 1 ?anomalyCount/ Object.keys(row['anomalies']).length:null
                        ];
        } else {
-            array[index] = [new Date(row_time),null,null
+            aData[index] = [new Date(row_time),null,null
             ,_.find(incidents,function(n){return n['datetime']['$date'] == row_time;})?1.1:null,
             null];
        }
     });
-    return array;
+    return out
 };
 
-## %else:
- ##           ${sum(filter(lambda x: x< max_vehicles,i['readings'].values()))},
-var pData = function(sensor) {
-    var array = [];
-    allData.forEach(function(row, index, in_array) {
-        // columns are: date,reading, prediction,
-        var row_time = row["datetime"]["$date"];
-        array[index] = [new Date(row_time),
-                        row['readings'][sensor] < ${max_vehicles}?row['readings'][sensor]:null];
-       /* if (row['predictions'] == undefined) {
-            array[index].push(null);
+var setupDygraphs = function() {
+
+    loadData(${time_start.strftime('%s')},${time_end.strftime('%s')},function(){
+         var arReadings = makeAnomalyReadingArrays(pfield);
+         if (arReadings.aData.length == 0) {
+            console.log("no anomaly data");
+            $('#anomaly-chart').before('<div class="bs-callout bs-callout-danger">\
+             <h4>Nothing to Display!</h4>\
+          There\'s no anomaly values for this time period. It might not have been analysed yet.\
+        </div>').height('0');
         } else {
-            array[index].push(row['predictions'][sensor] < ${max_vehicles}?row['predictions'][sensor]:null);
-        }*/
-    });
-    return array;
-};
+            anomalyChart = new Dygraph(document.getElementById('anomaly-chart'), arReadings.aData, {
+              title: 'Anomaly value for intersection ${intersection['intersection_number']}',
+              ylabel: 'Anomaly',
+              xlabel: 'Date',
+              anomaly: {
+                    color: "blue",
+                },
+              likelihood: {
+                    color: "red",
+                },
+              incident: {
+                    color: "green",
+                    strokeWidth: 0.0,
+                    pointSize: 4,
+              },
+              incident_predict: {
+                    color: "orange",
+                    strokeWidth: 0.0,
+                    pointSize: 4,
+              },
+              axes: {
+                y: {
+                   // valueRange: [0,1.5]
+                }
+              },
+              zoomCallback: function(min, max, yRanges) {
+                  zoomGraph(predictionChart, min, max);
+              },
+              highlightCallback: function(event, x, points, row, seriesName) {
+                  highlightX(predictionChart, row);
+                  if (points[2].xval) {
+                      // find idx of point[2] in incidents array
+                      // using xval
+                    var accidentIdx = 1+_.findIndex(incidents, function(x){return Math.round(x["datetime"]["$date"]/300000)*300000 == points[2].xval;});
+                    //console.log("Moused over", accidentIdx);
+                    highlightAccident(accidentIdx);
+                  }
+                  if (points[3].yval) {
+                      $('#anomaly-list-label').text("High Anomaly at "+moment.utc(points[3].xval).format('LLLL'));
+                      var threshold = parseFloat($('#threshold-input').val());
+                      var sensors = [];
+                      _.each(allData[row]['anomalies'], function(val, key) {
+                        if(val.likelihood > threshold)
+                            sensors.push(key);    
+                      });
+                      var anomaly_list = $('p#form-anomalies');
+                      anomaly_list.empty();
+                      $.each(sensors, function(i, val){
+                          anomaly_list.append('<a href="#observations" class="sensor-swapper">'+val+'</a> ');
+                      });
+                  }
+              },
+              labels: ['UTC', 'anomaly', 'likelihood', 'incident', 'incident_predict'],
+               <%include file="dygraph_weekend.js"/>
+            });
+        }
+         predictionChart = new Dygraph(document.getElementById('prediction-chart'), arReadings.pData, {
+         labels: ['UTC','Reading'],
+         title: 'Observation on Sensor: '+ pfield,
 
+         ylabel: 'Volume',
+         xlabel: 'Date',
+         zoomCallback: function(min, max, yRanges) {
+             zoomGraph(anomalyChart, min, max);
+         },
+         highlightCallback: function(event, x, point, row, seriesName) {
+             highlightX(anomalyChart, row);
+         },
+         <%include file="dygraph_weekend.js"/>
+        });
+           
+
+    });
+   
+};
+if (!${has_anything}) {
+    console.log("no readings data");
+        $('#prediction-chart').before('<div class="bs-callout bs-callout-danger">\
+      <h4>Nothing to Display!</h4>\
+      There\'s no readings for this time period. It might not have been analysed yet.\
+    </div>').height('0');
+}
 var zoomGraph = function(graph, min, max) {
     if(graph)
     graph.updateOptions({
@@ -282,95 +388,11 @@ var highlightX = function(graph, row) {
 };
 
 var dispFormat = "%d/%m/%y %H:%M";
-var anomalyData = aData(pfield);
-if (anomalyData.length ==0) {
-    $('#anomaly-chart').before('<div class="bs-callout bs-callout-danger">\
-  <h4>Nothing to Display!</h4>\
-  There\'s no anomaly values for this time period. It might not have been analysed yet.\
-</div>').height('0');
-} else {
-    anomalyChart = new Dygraph(document.getElementById('anomaly-chart'), anomalyData, {
-      title: 'Anomaly value for intersection ${intersection['intersection_number']}',
-      ylabel: 'Anomaly',
-      xlabel: 'Date',
-      anomaly: {
-            color: "blue",
-        },
-      likelihood: {
-            color: "red",
-        },
-      incident: {
-            color: "green",
-            strokeWidth: 0.0,
-            pointSize: 4,
-      },
-      incident_predict: {
-            color: "orange",
-            strokeWidth: 0.0,
-            pointSize: 4,
-      },
-      axes: {
-        y: {
-           // valueRange: [0,1.5]
-        }
-      },
-      zoomCallback: function(min, max, yRanges) {
-          zoomGraph(predictionChart, min, max);
-      },
-      highlightCallback: function(event, x, points, row, seriesName) {
-          highlightX(predictionChart, row);
-          if (points[2].xval) {
-              // find idx of point[2] in incidents array
-              // using xval
-            var accidentIdx = 1+_.findIndex(incidents, function(x){return Math.round(x["datetime"]["$date"]/300000)*300000 == points[2].xval;});
-            //console.log("Moused over", accidentIdx);
-            highlightAccident(accidentIdx);
-          }
-          if (points[3].yval) {
-              $('#anomaly-list-label').text("High Anomaly at "+moment.utc(points[3].xval).format('LLLL'));
-              var threshold = parseFloat($('#threshold-input').val());
-              var sensors = [];
-              _.each(allData[row]['anomalies'], function(val, key) {
-                if(val.likelihood > threshold)
-                    sensors.push(key);    
-              });
-              var anomaly_list = $('p#form-anomalies');
-              anomaly_list.empty();
-              $.each(sensors, function(i, val){
-                  anomaly_list.append('<a href="#observations" class="sensor-swapper">'+val+'</a> ');
-              });
-          }
-      },
-      labels: ['UTC', 'anomaly', 'likelihood', 'incident', 'incident_predict'],
-       <%include file="dygraph_weekend.js"/>
-    });
-}
-var predictionData = pData(pfield);
-if (predictionData.length ==0) {
-    $('#prediction-chart').before('<div class="bs-callout bs-callout-danger">\
-  <h4>Nothing to Display!</h4>\
-  There\'s no predictions or readings for this time period. It might not have been analysed yet.\
-</div>').height('0');
-} else {
-     predictionChart = new Dygraph(document.getElementById('prediction-chart'), predictionData, {
-     labels: ['UTC','Reading'],
-     title: 'Observation on Sensor: '+ pfield,
 
-     ylabel: 'Volume',
-     xlabel: 'Date',
-     zoomCallback: function(min, max, yRanges) {
-         zoomGraph(anomalyChart, min, max);
-     },
-     highlightCallback: function(event, x, point, row, seriesName) {
-         highlightX(anomalyChart, row);
-     },
-     <%include file="dygraph_weekend.js"/>
-    });
-}
 
 <%
-start_title = scores[0]['datetime'].strftime('%d/%m/%Y')
-end_title = scores[-1]['datetime'].strftime('%d/%m/%Y')
+start_title = time_start.strftime('%d/%m/%Y')
+end_title = time_end.strftime('%d/%m/%Y')
 %>
 $('input[name="daterange"]').daterangepicker({
     timePicker: true,
@@ -382,24 +404,11 @@ $('input[name="daterange"]').daterangepicker({
     endDate: '${end_title}'
 }).on('apply.daterangepicker', function(env, picker) {
     // load into the pickers the values, showing a spinner
-    var loader = $('#loaderImage');
+    var loader = $('.loaderImage');
     loader.show();
     var dates = $('#dateinput').val().split('-');
 
-    $.getJSON( '/get_readings_anomaly.json',
-        {
-            'from': dates[0].trim(),
-             'to': dates[1].trim(),
-             'intersection': '${intersection['intersection_number']}'
-        },
-        function(data) {
-            allData = data;
-            predictionChart.updateOptions( { 'file': pData(pfield)});
-            anomalyChart.updateOptions( { 'file': aData(pfield)});
-            updateIncidents($().text().split(' '));
-            loader.hide();
-        }).
-        fail(function(){ loader.hide();});
+    loadData(dates[0].trim(), dates[1].trim());
 });
 
 var opts = {
@@ -421,6 +430,7 @@ var lat, lng;
 
 $(document).ready(function() {
 
+   setupDygraphs();
    lat = ${intersection['loc']['coordinates'][1]};
    lng = ${intersection['loc']['coordinates'][0]};
 
@@ -445,10 +455,12 @@ $(document).ready(function() {
   $('body').on('click', '.sensor-swapper', function() {
      pfield = $(this).text();
      console.log('sensor swapping to',pfield);
-     predictionChart.updateOptions( { 'file': pData(pfield) , 'title': 'Observation on Sensor: '+pfield});
+      var arReadings = makeAnomalyReadingArrays(pfield);
+      predictionChart.updateOptions( { 'file': arReadings.pData, 'title': 'Observation on Sensor: '+pfield});
+      anomalyChart.updateOptions( { 'file': arReadings.aData});
+     
      $('#sensor-label').html('Sensor: '+pfield+' <b class="caret"></b>');
      $(this).parent().addClass('active').siblings().removeClass('active');
-     anomalyChart.updateOptions( { 'file': aData(pfield) });
   });
    $('.radius-swapper').click(function() {
       var radius = $(this).text();
@@ -466,7 +478,8 @@ $(document).ready(function() {
 
   $('#anomaly-params').change(function() {
     console.log("Anomaly chart params updated");
-    anomalyChart.updateOptions( { 'file': aData(pfield) });
+    
+    anomalyChart.updateOptions( { 'file':  makeAnomalyReadingArrays(pfield, 'anomaly').aData });
   }).on('submit',function(ev){ev.preventDefault();});
 });
 var mapCircle = null;
@@ -528,7 +541,7 @@ var setupIncidents = function(newRadius) {
     $('#incidents-table').append(row);
   });
   if(anomalyChart)
-    anomalyChart.updateOptions( { 'file': aData(pfield)});
+    anomalyChart.updateOptions( { 'file': makeAnomalyReadingArrays(pfield, 'anomaly').aData});
 
 };
 var updateIncidents = function(radius) {

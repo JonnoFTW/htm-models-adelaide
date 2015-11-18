@@ -5,7 +5,6 @@ pixelsPerLabel: 40,
 axes: {
     x: {
         axisLabelFormatter: function (d, gran, opts) {
-            console.log("gran==",gran);
             if(gran == Dygraph.DAILY)
                 return moment(d).format('ddd D MMM');
             else
