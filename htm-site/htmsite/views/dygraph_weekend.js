@@ -29,22 +29,23 @@ underlayCallback: function(canvas, area, g) {
                         var max_data_x = g.getValue(g.numRows() - 1, 0);
 
                         // get day of week
-                        var d = new Date(min_data_x);
-                        var dow = d.getUTCDay();
-
+                        var d = moment.utc(min_data_x);
+                        var dow = d.day();
+                        
+                        
                         var w = min_data_x;
                         // starting on Sunday is a special case
                         if (dow === 0) {
                             highlight_period(w, w + 12 * 3600 * 1000);
                         }
                         // find first saturday
-                        while (dow != 6) {
+                        while (dow != 5) {
                             w += 24 * 3600 * 1000;
-                            d = new Date(w);
-                            dow = d.getUTCDay();
+                            d = moment.utc(w);
+                            dow = d.day();
                         }
                         // shift back 1/2 day to center highlight around the point for the day
-                        //w -= 12 * 3600 * 1000;
+                       // w -= 12 * 3600 * 1000;
 
                         canvas.fillStyle = yellow;
                         while (w < max_data_x) {

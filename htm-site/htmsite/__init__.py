@@ -11,6 +11,7 @@ import os
 from pyramid.view import view_config
 import yaml
 import json
+from bson import json_util
 from geopy.distance import vincenty
 
 from pyramid.events import subscriber
@@ -294,7 +295,7 @@ def get_readings_anomaly_json(request):
     """
     
     args = request.matchdict
-    
+    request.response.content_type = 'application/json'
     return get_anomaly_scores(request.GET.get('from',None), request.GET.get('to',None), args['intersection'])
 
 
@@ -369,6 +370,7 @@ def du(unix):
 
 def get_accident_near_json(request):
     args = request.matchdict
+    request.response.content_type = 'application/json'
     intersection, time_start, time_end = args['intersection'], du(args['time_start']), du(args['time_end'])
     radius = int(args['radius'])
     return get_accident_near(time_start, time_end, intersection, radius)
@@ -379,12 +381,13 @@ def show_incidents(request):
     :param request:
     :return:
     """
-    from bson import json_util
-    start = datetime.utcfromtimestamp(1367245800)
-    end = datetime.utcfromtimestamp(1372516200)
-    incidents = []
-    # get incidents in this range in CITY OF ADELAIDE lga
     with _get_mongo_client( ) as client:
+        cursor = client[mongo_database][mongo_collection].find().sort('datetime')
+        start = cursor[0]['datetime']
+        end = cursor[cursor.count()-1]['datetime']
+        incidents = []
+        # get incidents in this range in CITY OF ADELAIDE lga
+    
         crashes = client[mongo_database]['crashes']
         results = crashes.find({'datetime':{'$gte': start, '$lte': end}, 'LGA_Name':'CITY OF ADELAIDE'})
         # get the readings of the nearest intersection at at the nearest time step

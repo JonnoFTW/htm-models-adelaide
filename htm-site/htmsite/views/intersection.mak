@@ -1,6 +1,9 @@
 <%
 from bson import json_util
 import json
+import time
+def mkunix(dt):
+  return int(time.mktime(dt.timetuple()))
 %>
 <%include file="header.html"/>
 %if intersection is None:
@@ -98,7 +101,7 @@ del intersection['_id']
                 <div class="panel panel-default">
                     <div class="panel-heading" id="observations">
                         <i class="fa fa-line-chart fa-fw"></i>
-                            Observation <i class="fa fa-spinner fa-pulse loaderImage" ></i>
+                            Observation <i class="fa fa-spinner fa-pulse loaderImage"></i>
                             <div class="dropdown pull-right">
                                 <a href="#" class="dropdown-toggle" data-toggle="dropdown" id="sensor-label">Sensor: ${pfield}<b class="caret"></b></a>
 
@@ -285,7 +288,7 @@ var makeAnomalyReadingArrays = function(sensor, only) {
 
 var setupDygraphs = function() {
 
-    loadData(${time_start.strftime('%s')},${time_end.strftime('%s')},function(){
+    loadData(${mkunix(time_start)},${mkunix(time_end)},function(){
          var arReadings = makeAnomalyReadingArrays(pfield);
          if (arReadings.aData.length == 0) {
             console.log("no anomaly data");
