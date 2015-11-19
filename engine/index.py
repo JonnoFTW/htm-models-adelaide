@@ -90,17 +90,15 @@ def get_sensor_encoder(name):
 def get_time_encoders():
     return [{
         'fieldname': u'timestamp',
-        'name': u'timestamp_hourOfWeek',
-        'hourOfWeek': 21,
+        'name': u'timestamp_dayOfWeek',
+        'hourOfWeek': (21, 1.0),
         'type': 'DateEncoder'
-    }
-   # {
-   #     'fieldname': 'timestamp',
-   #     'name': 'timestamp_dayOfWeek',
-   #     'type': 'DateEncoder',
-   #     'dayOfWeek': (21, 1)
-   # }
-    ]
+    },{
+        'fieldname': 'timestamp',
+        'name': 'timestamp_timeOfDay',
+        'type': 'DateEncoder',
+        'dayOfWeek': (21, 9.49)
+    }]
 
 
 def createModel(intersection):
@@ -209,6 +207,7 @@ class Worker(multiprocessing.Process):
         self.intersection = intersection
 
     def run(self):
+        locations_collection.find_one_and_update({'intersection_number': self.intersection}, {'$set':{'running':True}})
         anomaly_likelihood_helper = anomaly_likelihood.AnomalyLikelihood(200, 200, reestimationPeriod=10)
         model = create_single_sensor_model(self.sensor, self.intersection)
         while not self.done:
@@ -298,6 +297,7 @@ def process_readings(readings, intersection, write_anomaly, progress=True, multi
             write_anomaly_out(i, anomalies, predictions)
         if _smoothing:
             previous.append(i['readings'])
+    locations_collection.find_one_and_update({'intersection_number': intersection}, {'$unset':{'running':''}})
     if multi_model:
         for proc in models.values():
             proc.terminate()

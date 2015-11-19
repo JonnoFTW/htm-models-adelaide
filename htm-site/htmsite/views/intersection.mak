@@ -66,7 +66,11 @@ del intersection['_id']
                                 Lat: ${v['coordinates'][1]}, Lng: ${v['coordinates'][0]}
                             % elif k == 'sensors':
                                 %for sensor in v:
-                                    <a href="#observations" class="sensor-swapper">${sensor}</a>
+                                    <span
+                                        %if str(sensor) == str(pfield):
+                                            class="active"
+                                        %endif
+                                    ><a href="#observations" class="sensor-swapper">${sensor}</a></span>
                                 %endfor
                             % else:
                                 ${v}
@@ -214,6 +218,7 @@ var None = null;
 var True = true;
 var False = false;
 var anomalyChart, predictionChart;
+
 var incidents = ${json.dumps(incidents,default=json_util.default)|n};
 var radius = ${radius};
 var pfield = '${pfield}';
@@ -319,7 +324,7 @@ var setupDygraphs = function() {
               },
               axes: {
                 y: {
-                   // valueRange: [0,1.5]
+                    valueRange: [0,1.3]
                 }
               },
               zoomCallback: function(min, max, yRanges) {
@@ -463,7 +468,7 @@ $(document).ready(function() {
       anomalyChart.updateOptions( { 'file': arReadings.aData});
      
      $('#sensor-label').html('Sensor: '+pfield+' <b class="caret"></b>');
-     $(this).parent().addClass('active').siblings().removeClass('active');
+     $('.sensor-swapper:contains("'+pfield+'")').parent().addClass('active').siblings().removeClass('active');
   });
    $('.radius-swapper').click(function() {
       var radius = $(this).text();
@@ -482,7 +487,8 @@ $(document).ready(function() {
   $('#anomaly-params').change(function() {
     console.log("Anomaly chart params updated");
     
-    anomalyChart.updateOptions( { 'file':  makeAnomalyReadingArrays(pfield, 'anomaly').aData });
+    anomalyChart.updateOptions( { 'file':  makeAnomalyReadingArrays(pfield, 'anomaly').aData,
+                                  axes: {y: {valueRange: [0,1.3]}} });
   }).on('submit',function(ev){ev.preventDefault();});
 });
 var mapCircle = null;
