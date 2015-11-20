@@ -90,14 +90,14 @@ def get_sensor_encoder(name):
 def get_time_encoders():
     return [{
         'fieldname': u'timestamp',
-        'name': u'timestamp_dayOfWeek',
-        'hourOfWeek': (21, 1.0),
+        'name': u'timestamp_weekend',
+        'weekend': 21,
         'type': 'DateEncoder'
     },{
         'fieldname': 'timestamp',
         'name': 'timestamp_timeOfDay',
         'type': 'DateEncoder',
-        'dayOfWeek': (21, 9.49)
+        'timeOfDay': (21, 9.49)
     }]
 
 
