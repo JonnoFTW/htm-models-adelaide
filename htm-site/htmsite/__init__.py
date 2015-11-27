@@ -135,6 +135,12 @@ def get_anomaly_scores(from_date=None, to_date=None, intersection='3001', anomal
     :param intersection:  the intersection to get readings for
     :return:
     """
+    if type(from_date) is int:
+        from_date = du(from_date)
+    if type(to_date) is int:
+        to_date = du(to_date)
+    if from_date > to_date:
+        from_date, to_date = to_date, from_date
     with _get_mongo_client() as client:
         # input is a unix date
         coll = client[mongo_database][mongo_collection]
@@ -142,9 +148,9 @@ def get_anomaly_scores(from_date=None, to_date=None, intersection='3001', anomal
         if from_date or to_date:
             query['datetime'] = {}
         if from_date is not None:
-            query['datetime']['$gte'] = du(from_date)
+            query['datetime']['$gte'] = from_date
         if to_date is not None:
-            query['datetime']['$lte'] = du(to_date)
+            query['datetime']['$lte'] = to_date
         if anomaly_threshold is not None:
             query['anomaly_score'] = {'$gte': float(anomaly_threshold)}
         return coll.find(query, {'_id':0,'predictions':0}).sort('datetime', pymongo.ASCENDING)
@@ -166,6 +172,9 @@ def _get_daily_volume(data, hour=None):
                 counter[i['datetime'].date()] += c
     return counter
 
+def intersection_info(request):
+    request.response.content_type = 'application/json'
+    return _get_intersection(request.matchdict['intersection'])
 
 def _monthly_average(data):
     monthly_average = Counter()
@@ -244,7 +253,6 @@ def _get_report(intersection, report, start=None, end=None):
 
 def show_report(request):
     """
-
     :param request:
     :return:
     """
@@ -296,7 +304,13 @@ def get_readings_anomaly_json(request):
     
     args = request.matchdict
     request.response.content_type = 'application/json'
-    return get_anomaly_scores(request.GET.get('from',None), request.GET.get('to',None), args['intersection'])
+    ft = request.GET.get('from',None)
+    tt = request.GET.get('to',None)
+    if ft is not None:
+        ft = int(ft)
+    if tt is not None:
+        tt = int(tt)
+    return get_anomaly_scores(ft, tt, args['intersection'])
 
 
 def intersections_json():
@@ -331,6 +345,7 @@ def show_intersection(request):
     args = request.matchdict
     # show specific intersection if it exists
     site = args['site_no']
+    
     intersection = _get_intersection(site)
     if intersection is None:
         return render_to_response('views/intersection.mak',
@@ -339,17 +354,26 @@ def show_intersection(request):
     intersection['neighbours'] = _get_neighbours(site)
 
     cursor = get_anomaly_scores(intersection=site)
-    anomaly_score_count = cursor.count()
+    day_range = 60
+    #get the very latest date
+    if cursor.count() == 0:
+        anomaly_score_count = 0
+    else:
+        last = cursor[cursor.count()-1]['datetime']
+        
+        cursor = get_anomaly_scores(last - timedelta(days=day_range), last, intersection=site)
+        anomaly_score_count = cursor.count()
     if anomaly_score_count == 0:
         time_start = None
         time_end = None
     else:
         time_start = cursor[0]['datetime']
-        time_end = cursor[cursor.count()-1]['datetime']
+        time_end = cursor[anomaly_score_count - 1]['datetime']
     try:
         intersection['sensors'] = intersection['sensors']
     except:
         intersection['sensors'] = 'Unknown'
+    print
     incidents, radius = get_accident_near(time_start, time_end, intersection['intersection_number'])
     return render_to_response(
         'views/intersection.mak',
@@ -357,6 +381,7 @@ def show_intersection(request):
          'scores_count': anomaly_score_count,
          'incidents': incidents,
          'radius': radius,
+         'day_range': day_range,
          'time_start': time_start,
          'time_end': time_end
          },
@@ -425,6 +450,8 @@ def main(global_config, **settings):
     config.add_view(get_readings_anomaly_json, route_name='readings_anomaly_json', renderer='pymongo_cursor')
     config.add_view(intersections_json, route_name='intersection_json', renderer='json')
     config.add_view(show_intersection, route_name='intersection')
+    config.add_route('intersection_info', '/intersection_{intersection}.json')
+    config.add_view(intersection_info, route_name='intersection_info', renderer='bson');
     config.add_route('intersections', '/intersections')
     config.add_route('reports', '/reports/{intersection}/{report}')
     config.add_route('accidents', '/accidents/{intersection}/{time_start}/{time_end}/{radius}')

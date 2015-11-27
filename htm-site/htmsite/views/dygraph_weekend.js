@@ -17,7 +17,7 @@ axes: {
 },
 underlayCallback: function(canvas, area, g) {
                         var yellow = "rgba(255, 255, 102, 1.0)";
-
+                        canvas.fillStyle = yellow;
                         function highlight_period(x_start, x_end) {
                             var canvas_left_x = g.toDomXCoord(x_start);
                             var canvas_right_x = g.toDomXCoord(x_end);
@@ -27,30 +27,30 @@ underlayCallback: function(canvas, area, g) {
 
                         var min_data_x = g.getValue(0, 0);
                         var max_data_x = g.getValue(g.numRows() - 1, 0);
-
-                        // get day of week
-                        var d = moment.utc(min_data_x);
-                        var dow = d.day();
-                        
-                        
-                        var w = min_data_x;
-                        // starting on Sunday is a special case
-                        if (dow === 0) {
-                            highlight_period(w, w + 12 * 3600 * 1000);
+                        var w;
+                        for(var row =0; row < g.numRows(); row++) {
+                            w = g.getValue(row, 0);
+                            var d = moment.utc(w);
+                            if (d.day()==0 || d.day() == 6) {
+                                break;
+                            }
                         }
-                        // find first saturday
-                        while (dow != 5) {
-                            w += 24 * 3600 * 1000;
-                            d = moment.utc(w);
-                            dow = d.day();
+                        // w is now at the first visible weekend
+                        // find the end of the first weekend
+                        var first_weekend_start = w;
+                        var first_weekend_stop = w;
+                        while (moment.utc(first_weekend_stop).day() != 1) {
+                            first_weekend_stop += 5*60*1000;
                         }
-                        // shift back 1/2 day to center highlight around the point for the day
-                       // w -= 12 * 3600 * 1000;
-
-                        canvas.fillStyle = yellow;
+                        highlight_period(first_weekend_start, first_weekend_stop);
+                        var day_seconds = 24*3600*1000;
+                        w = first_weekend_stop + (5*day_seconds);
+                        
+                      
+                       
                         while (w < max_data_x) {
                             var start_x_highlight = w;
-                            var end_x_highlight = w + 2 * 24 * 3600 * 1000;
+                            var end_x_highlight = w + 2 * day_seconds;
                             // make sure we don't try to plot outside the graph
                             if (start_x_highlight < min_data_x) {
                                 start_x_highlight = min_data_x;
@@ -60,6 +60,6 @@ underlayCallback: function(canvas, area, g) {
                             }
                             highlight_period(start_x_highlight, end_x_highlight);
                             // calculate start of highlight for next Saturday
-                            w += 7 * 24 * 3600 * 1000;
+                            w += 7 * day_seconds;
                         }
                     }

@@ -132,9 +132,13 @@ del intersection['_id']
                 <div class="panel panel-default">
                     <div class="panel-heading">
                         <i class="fa fa-line-chart fa-fw"></i> Anomaly Scores <i class="fa fa-spinner fa-pulse loaderImage"></i>
+                        
+                        <span id="date-range-text" class="pull-right"></span>
                     </div>
                     <!-- /.panel-heading -->
                     <div class="panel-body">
+                       <button type="button" class="btn btn-info btn-arrow-left shift-data">Older</button>
+                       <button type="button" class="btn btn-info btn-arrow-right pull-right shift-data">Newer</button>
                        <figure style="width: 100%; height: 300px;"  id="anomaly-chart"></figure>
                        <form href="" class="form-inline" id="anomaly-params">
                            <div class="form-group">
@@ -238,17 +242,40 @@ var allData;
 var hideLoader = function() {
     $('.loaderImage').hide();
 };
+var modelRunning = 
+%if 'running' in intersection:
+    true;
+%else:
+    false;
+%endif
 var loadData = function(from,to, callback) {
-    console.log("Loading data from json");
+    console.log("Loading data from json",from,to);
     var args =  {
             'from': from,
              'to': to,
     };
+    $('.loaderImage').show();
     $.getJSON( '/get_readings_anomaly_${intersection['intersection_number']}.json', args,
         function(data) {
-            allData = data;
-            if(callback)
-                callback(); 
+            if(data.length == 0) {
+                // no data!
+                console.log('No data');
+            } else {
+                allData = data;
+                var txt = moment.utc(data[0]["datetime"]["$date"]).format('LLL') + " - " + moment.utc(data[data.length-1]["datetime"]["$date"]).format('LLL');
+                
+                $('#date-range-text').text(txt);
+                if(callback)
+                    callback(); 
+                anomalyChart.updateOptions({
+                  dateWindow: null,
+                  valueRange: null
+                });
+                predictionChart.updateOptions({
+                  dateWindow: null,
+                  valueRange: null
+                });
+            }
             hideLoader();
         }).
         fail(function(){ hideLoader();});
@@ -398,26 +425,6 @@ var highlightX = function(graph, row) {
 var dispFormat = "%d/%m/%y %H:%M";
 
 
-<%
-start_title = time_start.strftime('%d/%m/%Y')
-end_title = time_end.strftime('%d/%m/%Y')
-%>
-$('input[name="daterange"]').daterangepicker({
-    timePicker: true,
-    timePickerIncrement: 5,
-    locale: {
-        format: 'DD/MM/YYYY H:mm'
-    },
-    startDate: '${start_title}',
-    endDate: '${end_title}'
-}).on('apply.daterangepicker', function(env, picker) {
-    // load into the pickers the values, showing a spinner
-    var loader = $('.loaderImage');
-    loader.show();
-    var dates = $('#dateinput').val().split('-');
-
-    loadData(dates[0].trim(), dates[1].trim());
-});
 
 var opts = {
   "dataFormatX": function (x) { return d3.time.format('${date_format}').parse(x); },
@@ -432,13 +439,44 @@ var opts = {
     $(tt).hide();
   }
 };
+<%
+start_title = time_start.strftime('%d/%m/%Y')
+end_title = time_end.strftime('%d/%m/%Y')
+%>
 %endif
+
+<%
+if scores_count == 0:
+   start_title = incidents[0]['datetime'].strftime('%d/%m/%Y')
+   end_title = incidents[-1]['datetime'].strftime('%d/%m/%Y')
+%>
+
+var daterangepickerformat = 'DD/MM/YYYY H:mm';
+$('input[name="daterange"]').daterangepicker({
+    timePicker: true,
+    timePickerIncrement: 5,
+    locale: {
+        format: daterangepickerformat
+    },
+    startDate: '${start_title}',
+    endDate: '${end_title}'
+}).on('apply.daterangepicker', function(env, picker) {
+    var dates = $('#dateinput').val().split('-');
+    loadData(moment.utc(dates[0].trim(),daterangepickerformat).unix() ,
+             moment.utc(dates[1].trim(), daterangepickerformat).unix(),
+             setChartsFromMake);
+});
 var mapCrash;
 var lat, lng;
 
+var setChartsFromMake = function() {
+  var arReadings = makeAnomalyReadingArrays(pfield);
+  predictionChart.updateOptions( { 'file': arReadings.pData, 'title': 'Observation on Sensor: '+pfield});
+  anomalyChart.updateOptions( { 'file': arReadings.aData});
+};
 $(document).ready(function() {
-
-   setupDygraphs();
+   if(${scores_count}>0)
+       setupDygraphs();
    lat = ${intersection['loc']['coordinates'][1]};
    lng = ${intersection['loc']['coordinates'][0]};
 
@@ -449,7 +487,36 @@ $(document).ready(function() {
     div: '#map-incident',
     zoom: 15
   });
-
+  $('.shift-data').click(function(e) {
+    // determine if we are older or newer
+    var older = $(this).text()=='Older';
+    var from,to;
+    if(older) {
+        to = predictionChart.getValue(0,0)/1000; // lowest reading
+        from = to - (${day_range}*24*60*60);// lowest reading in chart - ${day_range} days
+    } else {
+        to = predictionChart.getValue(predictionChart.numRows()-1,0)/1000;
+        from = to + (${day_range}*24*60*60);
+    }
+    loadData(from, to, setChartsFromMake);
+    // load accidents from the new timeframe too
+    updateIncidents(radius, from, to);
+  });
+  % if 'running' in intersection:
+    var intervalId = window.setInterval(function(){
+        console.log("reloading because site is running");
+        from = predictionChart.getValue(0,0)/1000;
+        to = predictionChart.getValue(predictionChart.numRows()-1,0)/1000;
+        loadData(from, to, setChartsFromMake);
+        
+        $.getJSON('/intersection_${intersection['intersection_number']}.json',function(data){
+            if(!data.hasOwnProperty('running')) {
+                console.log("Stopping reloading");
+                clearInterval(intervalId);
+            }
+        });
+    },1000*10);
+  %endif
   setupIncidents(radius);
   function toggleChevron(e) {
       $(e.target)
@@ -463,15 +530,13 @@ $(document).ready(function() {
   $('body').on('click', '.sensor-swapper', function() {
      pfield = $(this).text();
      console.log('sensor swapping to',pfield);
-      var arReadings = makeAnomalyReadingArrays(pfield);
-      predictionChart.updateOptions( { 'file': arReadings.pData, 'title': 'Observation on Sensor: '+pfield});
-      anomalyChart.updateOptions( { 'file': arReadings.aData});
+      setChartsFromMake();
      
      $('#sensor-label').html('Sensor: '+pfield+' <b class="caret"></b>');
      $('.sensor-swapper:contains("'+pfield+'")').parent().addClass('active').siblings().removeClass('active');
   });
    $('.radius-swapper').click(function() {
-      var radius = $(this).text();
+      radius = $(this).text();
       $('#radius-label').html('Radius: '+radius+'m <b class="caret"></b>');
       updateIncidents(radius);
   });
@@ -526,14 +591,20 @@ var setupIncidents = function(newRadius) {
 
   });
   }
-    $.each(incidents, function(){
-
-      var windowStr = '$'+this.Total_Damage;
+    $.each(incidents, function(idx, obj){
+      var windowStr = '<b>Damage:</b> $'+this.Total_Damage+
+                      '<br><b>Vehicles:</b> '+this.Total_Vehicles_Involved+
+                      '<br><b>Cause:</b> '+this.App_Error+
+                      '<br><b>Type:</b> '+this.Crash_Type+
+                      '<br><b>Date:</b> '+moment.utc(this.datetime['$date']).format('LLL');
       var m = mapCrash.addMarker({
         lat: this.loc['coordinates'][1],
         lng: this.loc['coordinates'][0],
         infoWindow: {content:windowStr},
         icon: markerIcon(false),
+        click: function(e) {
+            highlightAccident(1+ idx);
+        }
       });
       crashMarkers.push(m);
   });
@@ -553,9 +624,13 @@ var setupIncidents = function(newRadius) {
     anomalyChart.updateOptions( { 'file': makeAnomalyReadingArrays(pfield, 'anomaly').aData});
 
 };
-var updateIncidents = function(radius) {
-    var start = $('input[name="daterange"]').data('daterangepicker').startDate.unix();
-    var end = $('input[name="daterange"]').data('daterangepicker').endDate.unix();
+var updateIncidents = function(radius, start, end) {
+
+    if(!start) {
+        start = $('input[name="daterange"]').data('daterangepicker').startDate.unix();
+        end = $('input[name="daterange"]').data('daterangepicker').endDate.unix();
+    }
+    console.log("Updating incidents in radius ", radius, "from ",start, " to ",end);
     $.getJSON('/accidents/${intersection['intersection_number']}/'+start+'/'+end+'/'+radius, function(data) {
         // repopulate table and markers
         incidents = data[0];
