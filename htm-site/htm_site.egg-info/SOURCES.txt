@@ -22,6 +22,7 @@ htmsite/assets/bootstrap-sortable/moment.min.js
 htmsite/views/dygraph_weekend.js
 htmsite/views/footer.html
 htmsite/views/header.html
+htmsite/views/incidents.mak
 htmsite/views/intersection.mak
 htmsite/views/list.mak
 htmsite/views/map.mak

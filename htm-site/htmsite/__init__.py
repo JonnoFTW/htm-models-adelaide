@@ -82,7 +82,11 @@ def _get_neighbours(intersection):
         return []
     with _get_mongo_client() as client:
         coll = client[mongo_database]['locations']
-        return list(coll.find({'intersection_number': {'$in': center['neighbours']}}))
+        if type(center['neighbours']) is dict:
+            neighbours = center['neighbours'].keys()
+        else:
+            neighbours = center['neighbours']
+        return list(coll.find({'intersection_number': {'$in': neighbours}}))
 
 
 def _get_intersections():
@@ -348,9 +352,11 @@ def show_intersection(request):
     
     intersection = _get_intersection(site)
     if intersection is None:
-        return render_to_response('views/intersection.mak',
+        return render_to_response('views/intersection.mako',
                                   {'intersection': intersection},
                                   request)
+    if 'neighbours' in intersection:
+        intersection['_neighbours'] = intersection['neighbours']
     intersection['neighbours'] = _get_neighbours(site)
 
     cursor = get_anomaly_scores(intersection=site)
@@ -376,7 +382,7 @@ def show_intersection(request):
     print
     incidents, radius = get_accident_near(time_start, time_end, intersection['intersection_number'])
     return render_to_response(
-        'views/intersection.mak',
+        'views/intersection.mako',
         {'intersection': intersection,
          'scores_count': anomaly_score_count,
          'incidents': incidents,

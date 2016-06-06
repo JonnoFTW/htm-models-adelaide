@@ -54,14 +54,47 @@ del intersection['_id']
                         </tr>
                     </thead>
                     <tbody>
+                        <%
+                           if '_neighbours' in intersection and type(intersection['_neighbours']) is dict:
+                            _neighbours = intersection['_neighbours']
+                           else:
+                            _neighbours = None
+                           try:
+                            del intersection['_neighbours']
+                           except:
+                            pass
+                        %>
                         % for k,v in intersection.items():
                         <tr>
                             <td>${k.replace('_',' ').title()}</td>
                             <td>
                             % if k == 'neighbours':
-                                % for n in v:
-                                    <a href="/intersection/${n['intersection_number']}">${n['intersection_number']}</a>
-                                % endfor
+                                %if _neighbours is not None:
+                                    % if _neighbours is not None:
+                                        ## make a table neighbour id - from - to
+                                            Table of sensors from neighbour intersection to this intersection
+                                            <table class="table">
+                                                <thead>
+                                                <tr><th>Intersection</th><th>From</th><th>To</th></tr>
+                                                </thead>
+                                                <tbody>
+                                                % for nid in _neighbours:
+                                                    <tr>
+                                                        <td><a href="/intersection/${nid}">${nid}</a></td>
+                                                        <td>${", ".join(map(lambda x: str(x*8), _neighbours[nid]['from']))}</td>
+                                                        <td>${", ".join(map(lambda x: str(x*8), _neighbours[nid]['to']))}</td>
+                                                    </tr>
+                                                % endfor
+                                                </tbody>
+                                            </table>
+                                    % endif
+                                % else:
+                                    % for n in v:
+                                        <a href="/intersection/${n['intersection_number']}">${n['intersection_number']}</a>
+                                    % endfor
+                                %endif
+
+
                             % elif k == 'loc':
                                 Lat: ${v['coordinates'][1]}, Lng: ${v['coordinates'][0]}
                             % elif k == 'sensors':
@@ -144,6 +177,8 @@ del intersection['_id']
                            <div class="form-group">
                               <label for="threshold">Threshold</label>
                               <input type="text" class="form-control" id="threshold-input" placeholder="0.99" value="0.99">
+                              <label for="threshold">Mean Filter</label>
+                              <input type="number" class="form-control" id="mean-filter" placeholder="0" min="1" value="1">
                            </div>
                            <div class="checkbox">
                               <label><input type="checkbox" id="logarithm-input"> Log of likelihood</label>
@@ -151,6 +186,7 @@ del intersection['_id']
                           <div class="form-group">
                             <label id="anomaly-list-label">High Anomaly at: </label><p id="form-anomalies"></p>
                           </div>
+                          
                        </form>
                        
                     </div>
@@ -280,14 +316,34 @@ var loadData = function(from,to, callback) {
         }).
         fail(function(){ hideLoader();});
 };
+function Queue (size) {
+    this.queue = [];
+    this.size = size;
+};
+Queue.prototype.push = function(item) {
+    this.queue.push(item);
+    if(this.queue.length > this.size)
+        this.queue.shift();
+};
+Queue.prototype.shift = function() {
+    return this.queue.shift();
+    }
+Queue.prototype.avg = function() {
+    return _.reduce(this.queue, function(x,y){return x+y},0)/this.queue.length;
+}
 var makeAnomalyReadingArrays = function(sensor, only) {
     var threshold = parseFloat($('#threshold-input').val());
+    var meanFilter = parseInt($('#mean-filter').val());
     var logarithm = $('#logarithm-input').is(':checked');
-    console.log("threshold:", threshold, "log", logarithm);
+    console.log("threshold:", threshold, "log", logarithm, "mean filter size", meanFilter);
     //return an array made from all data
     var aData = new Array(allData.length);
     var pData = new Array(allData.length);
     var out;
+    var queue = null;
+    if(meanFilter > 1) {
+        queue = new Queue(meanFilter);
+    }
     if (only == 'anomaly')
        out = {'aData': aData};
     else if(only == 'readings')
@@ -298,8 +354,17 @@ var makeAnomalyReadingArrays = function(sensor, only) {
         // columns are: date,anomaly, likelihood, incident, incident_predict],
         
         var row_time = row["datetime"]["$date"];
-        if(only != 'anomaly')
-            pData[index] = [new Date(row_time), row['readings'][sensor] < ${max_vehicles}?row['readings'][sensor]:null];
+        
+        if(only != 'anomaly') {
+            
+            var value = row['readings'][sensor] < ${max_vehicles}?row['readings'][sensor]:null;
+            var mean_value = null;
+            if(queue) {
+                queue.push(value);
+                mean_value = queue.avg();
+            }
+            pData[index] = [new Date(row_time), value, mean_value];
+        }   
         if(row['anomalies'] !== undefined && only != 'readings') {
             anomalyCount = _.filter(row['anomalies'],function(n){return n['likelihood'] > threshold;}).length ;
             aData[index] = [new Date(row_time),
@@ -386,18 +451,18 @@ var setupDygraphs = function() {
             });
         }
          predictionChart = new Dygraph(document.getElementById('prediction-chart'), arReadings.pData, {
-         labels: ['UTC','Reading'],
-         title: 'Observation on Sensor: '+ pfield,
+             labels: ['UTC','Reading', 'Mean'],
+             title: 'Observation on Sensor: '+ pfield,
 
-         ylabel: 'Volume',
-         xlabel: 'Date',
-         zoomCallback: function(min, max, yRanges) {
-             zoomGraph(anomalyChart, min, max);
-         },
-         highlightCallback: function(event, x, point, row, seriesName) {
-             highlightX(anomalyChart, row);
-         },
-         <%include file="dygraph_weekend.js"/>
+             ylabel: 'Volume',
+             xlabel: 'Date',
+             zoomCallback: function(min, max, yRanges) {
+                 zoomGraph(anomalyChart, min, max);
+             },
+             highlightCallback: function(event, x, point, row, seriesName) {
+                 highlightX(anomalyChart, row);
+             },
+             <%include file="dygraph_weekend.js"/>
         });
            
 
@@ -472,7 +537,8 @@ var lat, lng;
 var setChartsFromMake = function() {
   var arReadings = makeAnomalyReadingArrays(pfield);
   predictionChart.updateOptions( { 'file': arReadings.pData, 'title': 'Observation on Sensor: '+pfield});
-  anomalyChart.updateOptions( { 'file': arReadings.aData});
+  anomalyChart.updateOptions( { 'file': arReadings.aData, axes: {y: {valueRange: [0,1.3]}}});
+  
 };
 $(document).ready(function() {
    if(${scores_count}>0)
@@ -551,9 +617,7 @@ $(document).ready(function() {
 
   $('#anomaly-params').change(function() {
     console.log("Anomaly chart params updated");
-    
-    anomalyChart.updateOptions( { 'file':  makeAnomalyReadingArrays(pfield, 'anomaly').aData,
-                                  axes: {y: {valueRange: [0,1.3]}} });
+    setChartsFromMake();
   }).on('submit',function(ev){ev.preventDefault();});
 });
 var mapCircle = null;

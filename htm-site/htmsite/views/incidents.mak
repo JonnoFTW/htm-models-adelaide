@@ -21,6 +21,10 @@
 </tr>
 </thead>
 <tbody class="searchable">
+<%
+count = 0
+count_other = 0
+%>
 % for i in incidents:
     %if len(i[1]):
     <tr>
@@ -28,20 +32,34 @@
         <td><a href="/intersection/${i[2]['intersection_number']}">${i[2]['intersection_number']}</a></td>
         <td>${"%.2f" %i[3]}m</td>
         <td>${i[0]['App_Error']}</td>
+        <%
+        triggered = False
+        %>
         %for j in i[1]:
             <td >
             %if 'anomalies' in j:
             <b>${j['datetime'].strftime("%H:%M")}</b></br><p>
             ${", ".join([k+": "+str(v['likelihood']) for k,v in j['anomalies'].items() if v['likelihood'] > 0.99])}
+            <%
+                if any(map(lambda x: x[1]['likelihood']>0.99, j['anomalies'].items())):
+                    triggered = True
+            %>
             </p>
             %endif
             </td>
         %endfor
+        <%
+            if triggered:
+                count +=1
+            else:
+                count_other += 1
+        %>
     </tr>
     %endif
 % endfor
 </tbody>
 </table>
+Incidents exceeding threshold: ${count}, none exceeding: ${count_other}
 </div></div>
 </div>
 </div>
