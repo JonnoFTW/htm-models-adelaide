@@ -379,7 +379,6 @@ def show_intersection(request):
         intersection['sensors'] = intersection['sensors']
     except:
         intersection['sensors'] = 'Unknown'
-    print
     incidents, radius = get_accident_near(time_start, time_end, intersection['intersection_number'])
     return render_to_response(
         'views/intersection.mako',

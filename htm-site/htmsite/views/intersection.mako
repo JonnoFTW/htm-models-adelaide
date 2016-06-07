@@ -59,18 +59,18 @@ del intersection['_id']
                             _neighbours = intersection['_neighbours']
                            else:
                             _neighbours = None
-                           try:
-                            del intersection['_neighbours']
-                           except:
-                            pass
                         %>
                         % for k,v in intersection.items():
                         <tr>
+                            % if k in ['scats_diagram', '_neighbours']:
+                            <%
+                            continue
+                            %>
+                            % endif
                             <td>${k.replace('_',' ').title()}</td>
                             <td>
                             % if k == 'neighbours':
                                 %if _neighbours is not None:
-                                    % if _neighbours is not None:
                                         ## make a table neighbour id - from - to
                                             Table of sensors from neighbour intersection to this intersection
                                             <table class="table">
@@ -87,7 +87,6 @@ del intersection['_id']
                                                 % endfor
                                                 </tbody>
                                             </table>
-                                    % endif
                                 % else:
                                     % for n in v:
                                         <a href="/intersection/${n['intersection_number']}">${n['intersection_number']}</a>
@@ -216,7 +215,7 @@ del intersection['_id']
                 <!-- /.panel-heading -->
                 <table class="table table-striped">
                     <thead>
-                        <tr>
+                      <tr>
                         <th>Time</th>
                         <th>Error</th>
                         <th>Vehicles</th>
@@ -224,7 +223,7 @@ del intersection['_id']
                         <th>Crash Type</th>
                         <th>Involves 4WD</th>
                         <th>Total Damage</th>
-                        </tr>
+                      </tr>
                     </thead>
                     <tbody id='incidents-table'>
                     </tbody>
@@ -251,6 +250,21 @@ del intersection['_id']
                 <!-- /.panel-body -->
             </div>
         </div>
+        %if 'scats_diagram' in intersection:
+             <div class="col-lg-12">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <i class="fa fa-info fa-fw"></i> SCATS Diagram
+                    </div>
+                    <div class="panel-body">
+##                         <div style="height:600px">
+                            <img class="img-responsive" src="data:image/png;base64,${intersection['scats_diagram']}">
+##                         </div>
+                    </div>
+                    <!-- /.panel-body -->
+                </div>
+            </div>
+         %endif
     </div>
 </div>
 <script type="text/javascript">
