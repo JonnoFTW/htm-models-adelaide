@@ -1,40 +1,24 @@
+<%include file="header.html"/>
+
 <%
 from bson import json_util
 import json
+from pluck import pluck
 import time
 def mkunix(dt):
   return int(time.mktime(dt.timetuple()))
-%>
-<%include file="header.html"/>
-%if intersection is None:
-<div class="container">
-    <div class="row">
-        <div class="col-lg-12">
-            <div class="panel panel-default">
-                <div class="panel-body">
-                   <div class="bs-callout bs-callout-danger">
-                      <h4>No such intersection exists!</h4>
-                          I don't know about that intersection
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-%else:
 
-<%
+has_anything = scores_count > 0
 pfield = str(intersection['sensors'][0])
 if isinstance(intersection['sensors'], basestring):
- popular_sensors = []
- intersection['sensors'] = []
+  popular_sensors = []
+  intersection['sensors'] = []
 else:
- popular_sensors = map(int,intersection['sensors'])
- intersection['sensors'] = sorted(map(int,intersection['sensors']))
-has_anything = scores_count > 0
+  popular_sensors = map(int,intersection['sensors'])
+  intersection['sensors'] = sorted(map(int,intersection['sensors']))
+
 del intersection['_id']
 %>
-
 <script type="text/javascript" src="//cdn.jsdelivr.net/bootstrap.daterangepicker/2/daterangepicker.js"></script>
 <script type="text/javascript" src="/assets/fontawesome-markers.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
@@ -54,15 +38,12 @@ del intersection['_id']
                         </tr>
                     </thead>
                     <tbody>
-                        <%
-                           if '_neighbours' in intersection and type(intersection['_neighbours']) is dict:
-                            _neighbours = intersection['_neighbours']
-                           else:
-                            _neighbours = None
-                        %>
                         % for k,v in intersection.items():
+                        <%
+##                             print k,v
+                            %>
                         <tr>
-                            % if k in ['scats_diagram', '_neighbours']:
+                            % if k in ['scats_diagram']:
                             <%
                             continue
                             %>
@@ -70,30 +51,66 @@ del intersection['_id']
                             <td>${k.replace('_',' ').title()}</td>
                             <td>
                             % if k == 'neighbours':
-                                %if _neighbours is not None:
-                                        ## make a table neighbour id - from - to
-                                            Table of sensors from neighbour intersection to this intersection
-                                            <table class="table">
-                                                <thead>
-                                                <tr><th>Intersection</th><th>From</th><th>To</th></tr>
-                                                </thead>
-                                                <tbody>
-                                                % for nid in _neighbours:
-                                                    <tr>
-                                                        <td><a href="/intersection/${nid}">${nid}</a></td>
-                                                        <td>${", ".join(map(lambda x: str(x*8), _neighbours[nid]['from']))}</td>
-                                                        <td>${", ".join(map(lambda x: str(x*8), _neighbours[nid]['to']))}</td>
-                                                    </tr>
-                                                % endfor
-                                                </tbody>
-                                            </table>
-                                % else:
-                                    % for n in v:
-                                        <a href="/intersection/${n['intersection_number']}">${n['intersection_number']}</a>
+                                <select class="select2-from form-control" multiple style="width:100%" id="neighbour-list">
+                                      % for n in v:
+                                        <option selected value="${n['intersection_number']}">${n['intersection_number']}</option>
+                                      % endfor
+                                </select>
+                                <button id="save-neighbours-list" type="button" class="btn btn-primary">Save</button>
+                                <div class="alert alert-success" id="list-alert" style="display:none" role="alert"> Saved!</div>
+                            % elif k == 'neighbours_sensors':
+                                ## make a table neighbour id - from - to
+                                Table of sensors from neighbour intersection to this intersection
+                                <table class="table table-condensed">
+                                    <thead>
+                                    <tr>
+                                        <th style="width: 10%">Intersection</th>
+                                        <th style="width: 45%">From</th>
+                                        <th style="width: 45%">To</th></tr>
+                                    </thead>
+                                    <tbody id="neighbour-sensors">
+                                    % for nid in pluck(intersection['neighbours'], 'intersection_number'):
+                                        <tr data-intersection="${nid}">
+                                            <td><a href="/intersection/${nid}">${nid}</a></td>
+                                            <td>
+                                                <select class="select2-from form-control sensor-map" multiple style="width:100%" data-intersection-from="${nid}">
+                                                    <% neighbour_intersection = {k['intersection_number']:k for k in intersection['neighbours']}[nid] %>
+                                                    % if 'sensors' in neighbour_intersection:
+                                                        % for sensor in sorted(neighbour_intersection['sensors'], key=lambda x: int(x)):
+                                                            <% sensor = int(sensor)/8 %>
+                                                            ## sensors on the other end
+                                                                <%
+                                                                  checked = ""
+    ##                                                               print intersection
+                                                                  if nid in intersection['neighbours_sensors'] and sensor in intersection['neighbours_sensors'][nid]['from']:
+                                                                    checked = "selected"
+                                                                %>
+                                                            <option ${checked} value="${sensor}">${sensor}</option>
+                                                        % endfor
+                                                    % endif
+                                                </select>
+                                            <td>
+                                                ## sensors on this intersection
+                                                  <select class="select2-to form-control sensor-map" multiple style="width:100%" data-intersection-to="${nid}">
+                                                    %if 'neighbours_sensors' in intersection and nid in intersection['neighbours_sensors']:
+                                                        %for sensor in sorted(intersection['sensors'], key=lambda x: int(x)):
+                                                            <% sensor = int(sensor)/8 %>
+                                                            ## sensors on the this end
+                                                             <%
+                                                                  checked = ""
+                                                                  if  nid in intersection['neighbours_sensors'] and sensor in intersection['neighbours_sensors'][nid]['to']:
+                                                                    checked = "selected"
+                                                                %>
+                                                            <option ${checked} value="${sensor}">${sensor}</option>
+                                                        % endfor
+                                                    %endif
+                                                </select>
+                                        </tr>
                                     % endfor
-                                %endif
-
-
+                                    </tbody>
+                                </table>
+                                <button id="save-neighbours" type="button" class="btn btn-primary">Save</button>
+                                <div class="alert alert-success" id="update-alert" style="display:none" role="alert"> Saved!</div>
                             % elif k == 'loc':
                                 Lat: ${v['coordinates'][1]}, Lng: ${v['coordinates'][0]}
                             % elif k == 'sensors':
@@ -130,8 +147,38 @@ del intersection['_id']
 
             <%include file="time_range_panel.html"/>
         </div>
+        <div class="col-lg-6">
+              <div class="panel panel-default">
+                  <div class="panel-heading" id="observations">
+                    <i class="fa fa-line-chart fa-fw"></i>
+                        Neighbour Preview
+                </div>
+                     <div class="panel-body">
+                        <img id="neighbour-preview" class="img-responsive" src=""/>
+                    </div>
+              </div>
+        </div>
+        <div class="col-lg-6">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <i class="fa fa-info fa-fw"></i> SCATS Diagram
+                    </div>
+                    <div class="panel-body">
+##                         <div style="height:600px">
+                        % if 'scats_diagram' in intersection:
+                             <img class="img-responsive" src="data:image/png;base64,${intersection['scats_diagram']}">
+                        %else:
+                            <img class="img-responsive" src="/assets/missing.png">
+                        % endif
+
+##                         </div>
+                    </div>
+                    <!-- /.panel-body -->
+                </div>
+            </div>
+
     </div>
-    % if has_anything:
+    % if scores_count:
         <div class="row">
             <div class="col-lg-12" >
                 <div class="panel panel-default">
@@ -250,21 +297,21 @@ del intersection['_id']
                 <!-- /.panel-body -->
             </div>
         </div>
-        %if 'scats_diagram' in intersection:
-             <div class="col-lg-12">
-                <div class="panel panel-default">
-                    <div class="panel-heading">
-                        <i class="fa fa-info fa-fw"></i> SCATS Diagram
-                    </div>
-                    <div class="panel-body">
-##                         <div style="height:600px">
-                            <img class="img-responsive" src="data:image/png;base64,${intersection['scats_diagram']}">
-##                         </div>
-                    </div>
-                    <!-- /.panel-body -->
-                </div>
-            </div>
-         %endif
+##         %if 'scats_diagram' in intersection:
+##              <div class="col-lg-12">
+##                 <div class="panel panel-default">
+##                     <div class="panel-heading">
+##                         <i class="fa fa-info fa-fw"></i> SCATS Diagram
+##                     </div>
+##                     <div class="panel-body">
+## ##                         <div style="height:600px">
+##                             <img class="img-responsive" src="data:image/png;base64,${intersection['scats_diagram']}">
+## ##                         </div>
+##                     </div>
+##                     <!-- /.panel-body -->
+##                 </div>
+##             </div>
+##          %endif
     </div>
 </div>
 <script type="text/javascript">
@@ -278,6 +325,11 @@ var radius = ${radius};
 var pfield = '${pfield}';
 // highlight the ith incident in the map
 // and on the table
+##     console.log("Select2 running");
+    $('select').select2({
+        tags: true
+    });
+
 
 var highlightAccident = function(idx) {
     var query = '#incidents-table > tr:nth-child('+idx+')';
@@ -292,12 +344,7 @@ var allData;
 var hideLoader = function() {
     $('.loaderImage').hide();
 };
-var modelRunning = 
-%if 'running' in intersection:
-    true;
-%else:
-    false;
-%endif
+var modelRunning = ${'running' in intersection};
 var loadData = function(from,to, callback) {
     console.log("Loading data from json",from,to);
     var args =  {
@@ -504,7 +551,6 @@ var highlightX = function(graph, row) {
 var dispFormat = "%d/%m/%y %H:%M";
 
 
-
 var opts = {
   "dataFormatX": function (x) { return d3.time.format('${date_format}').parse(x); },
   "tickFormatX": function (x) { return d3.time.format(dispFormat)(x); },
@@ -522,14 +568,23 @@ var opts = {
 start_title = time_start.strftime('%d/%m/%Y')
 end_title = time_end.strftime('%d/%m/%Y')
 %>
-%endif
+
 
 <%
 if scores_count == 0:
    start_title = incidents[0]['datetime'].strftime('%d/%m/%Y')
    end_title = incidents[-1]['datetime'].strftime('%d/%m/%Y')
 %>
+var neighbour_diagrams = {
+    % for s in intersection['neighbours']:
+        % if 'scats_diagram' in s:
+            ${s['intersection_number']}: "data:image/png;base64,${s['scats_diagram']}",
+        %else:
+            ${s['intersection_number']}: "/assets/missing.png"
+        % endif
 
+    % endfor
+}
 var daterangepickerformat = 'DD/MM/YYYY H:mm';
 $('input[name="daterange"]').daterangepicker({
     timePicker: true,
@@ -542,7 +597,7 @@ $('input[name="daterange"]').daterangepicker({
 }).on('apply.daterangepicker', function(env, picker) {
     var dates = $('#dateinput').val().split('-');
     loadData(moment.utc(dates[0].trim(),daterangepickerformat).unix() ,
-             moment.utc(dates[1].trim(), daterangepickerformat).unix(),
+             moment.utc(dates[1].trim(),daterangepickerformat).unix(),
              setChartsFromMake);
 });
 var mapCrash;
@@ -702,6 +757,15 @@ var setupIncidents = function(newRadius) {
     anomalyChart.updateOptions( { 'file': makeAnomalyReadingArrays(pfield, 'anomaly').aData});
 
 };
+$('tbody#neighbour-sensors > tr').hover(function(e) {
+    var img = neighbour_diagrams[$(this).data('intersection')];
+##     console.log(num, neighbour_diagrams[num]);
+    if(img === undefined)
+            img = '/assets/missing.png';
+    $('#neighbour-preview').attr('src', img);
+}, function(e) {
+    ;
+});
 var updateIncidents = function(radius, start, end) {
 
     if(!start) {
@@ -717,10 +781,61 @@ var updateIncidents = function(radius, start, end) {
         setupIncidents(radius);
     });
 };
+
+
+%endif
+
 var crashMarkers = [];
 var crashDefault = '#B71C1C';
 var crashSelected = '#D9EDF7';
+var stoi = function(x){return parseInt(x)};
 
+var showSuccess = function(id, res) {
+    var msg = "Saved";
+    var box = $(id);
+    box.removeClass('alert-success alert-danger');
+    if (_.has(res, 'error')) {
+        msg = res.error;
+        box.addClass('alert-danger');
+    } else {
+        box.addClass('alert-success');
+    }
+    box.text(msg).fadeIn(1000).delay(2000).fadeOut(1000);
+}
+
+$('#save-neighbours-list').click(function(e) {
+    var data = _.map($('select#neighbour-list').val(), stoi).join();
+   $.post('/intersection/${intersection["intersection_number"]}/update_neighbours_list', {'neighbours':data}
+   ).success( function(res) {
+       showSuccess('#list-alert', res);
+       // refresh the page
+       console.log(res);
+       if(_.has(res, 'success'))
+        window.location.reload();
+    });
+});
+$('#save-neighbours').click(function(e) {
+    // ajax save the new neighbour organisation
+
+    var data = {}
+    _.each(_.keys(neighbour_diagrams), function(elem) {
+       data[elem] = {
+           'from':_.map($('select[data-intersection-from="'+elem+'"]').val(), stoi),
+           'to':_.map($('select[data-intersection-to="'+elem+'"]').val(), stoi)
+       }
+    });
+    console.log(data);
+    $.ajax({
+        url: '/intersection/${intersection["intersection_number"]}/update_neighbours',
+        type:'POST',
+        data: JSON.stringify(data),
+        contentType: "application/json; charset=utf-8",
+        dataType: "json",
+        success: function(res) {
+             showSuccess('#update-alert', res);
+        }
+    })
+});
 var markerIcon = function(selected) {
     return {
             path: fontawesome.markers.EXCLAMATION_CIRCLE,
@@ -732,9 +847,6 @@ var markerIcon = function(selected) {
             fillOpacity: 1,
            };
 };
-
 </script>
 
-%endif
 
-<%include file="footer.html"/>

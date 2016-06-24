@@ -39,6 +39,7 @@ try:
         mongo_collection = conf['mongo_collection']
         gmaps_key = conf['GMAPS_API_KEY']
         max_vehicles = conf['max_vehicles']
+
 except:
     raise Exception('No connection.yaml with mongo_uri defined! please make one with a mongo_uri variable')
 
@@ -339,6 +340,13 @@ def list_intersections(request):
         request=request
     )
 
+from pluck import pluck
+def get_diagrams(intersections):
+    with _get_mongo_client() as client:
+        db = client[mongo_database]
+        intersections = pluck(intersections, 'intersection_number')
+        return db['locations'].find({'intersection_number': {'$in': intersections}, 'scats_diagram': {'$exists': True}})
+
 
 def show_intersection(request):
     """
@@ -352,11 +360,9 @@ def show_intersection(request):
     
     intersection = _get_intersection(site)
     if intersection is None:
-        return render_to_response('views/intersection.mako',
-                                  {'intersection': intersection},
-                                  request)
-    if 'neighbours' in intersection:
-        intersection['_neighbours'] = intersection['neighbours']
+        return render_to_response('views/missing_intersection.mako', {},  request)
+    # if 'neighbours' in intersection:
+    #     intersection['_neighbours'] = intersection['neighbours']
     intersection['neighbours'] = _get_neighbours(site)
 
     cursor = get_anomaly_scores(intersection=site)
@@ -380,6 +386,9 @@ def show_intersection(request):
     except:
         intersection['sensors'] = 'Unknown'
     incidents, radius = get_accident_near(time_start, time_end, intersection['intersection_number'])
+    neighbour_diagrams = get_diagrams(intersection['neighbours'])
+    if 'neighbours_sensors' not in intersection:
+        intersection['neighbours_sensors'] = {k['intersection_number']:{'to':[],'from':[]} for k in intersection['neighbours']}
     return render_to_response(
         'views/intersection.mako',
         {'intersection': intersection,
@@ -388,7 +397,8 @@ def show_intersection(request):
          'radius': radius,
          'day_range': day_range,
          'time_start': time_start,
-         'time_end': time_end
+         'time_end': time_end,
+         'scats_diagrams': neighbour_diagrams
          },
         request=request
     )
@@ -405,6 +415,47 @@ def get_accident_near_json(request):
     radius = int(args['radius'])
     return get_accident_near(time_start, time_end, intersection, radius)
 
+
+def validate_nodes(nodes):
+    with _get_mongo_client() as client:
+        locs = client[mongo_database]['locations']
+        ns = locs.find({'intersection_number': {'$in': nodes}})
+        return ns.count() == len(nodes)
+
+@view_config(route_name='update_neighbours', renderer='json', request_method='POST')
+def update_neighbours(request):
+    with _get_mongo_client() as client:
+        locs = client[mongo_database]['locations']
+        data = request.json_body
+        # print data
+        if not validate_nodes(data.keys()):
+            return {'error': 'Invalid nodes'}
+        locs.update_one({'intersection_number': request.matchdict['site_no']},
+                        {
+                            '$set': {
+                                'neighbours_sensors': data
+                            }
+                        })
+        return {'success': True}
+
+@view_config(route_name='update_neighbour_list', renderer='json', request_method='POST')
+def update_neighbour_list(request):
+    with _get_mongo_client() as client:
+        locs = client[mongo_database]['locations']
+        data = request.POST['neighbours'].split(',')
+        # print data
+        # print data
+        if not validate_nodes(data):
+            return {'error': 'Invalid nodes'}
+        # return
+        locs.update_one({'intersection_number': request.matchdict['site_no']},
+                        {
+                            '$set': {
+                                'neighbours': data
+                            }
+                        })
+        return {'success': True}
+
 def show_incidents(request):
     """
     Show the
@@ -419,7 +470,7 @@ def show_incidents(request):
         # get incidents in this range in CITY OF ADELAIDE lga
     
         crashes = client[mongo_database]['crashes']
-        results = crashes.find({'datetime':{'$gte': start, '$lte': end}, 'LGA_Name':'CITY OF ADELAIDE'})
+        results = crashes.find({'datetime':{'$gte': start, '$lte': end}, 'LGA_Name': 'CITY OF ADELAIDE'})
         # get the readings of the nearest intersection at at the nearest time step
         td = timedelta(minutes=5)
         for crash in results:
@@ -434,7 +485,7 @@ def show_incidents(request):
                 'datetime': {'$gte': crash['datetime']- td,'$lte': crash['datetime'] + td},
                 'site_no': site['intersection_number']
             }).limit(3).sort('datetime')
-            incidents.append((crash,list(readings), site, vincenty(site['loc']['coordinates'], crash['loc']['coordinates']).meters))
+            incidents.append((crash, list(readings), site, vincenty(site['loc']['coordinates'], crash['loc']['coordinates']).meters))
   #  print json.dumps(incidents, indent=4, default=json_util.default)
     return render_to_response(
         'views/incidents.mak',
@@ -456,7 +507,9 @@ def main(global_config, **settings):
     config.add_view(intersections_json, route_name='intersection_json', renderer='json')
     config.add_view(show_intersection, route_name='intersection')
     config.add_route('intersection_info', '/intersection_{intersection}.json')
-    config.add_view(intersection_info, route_name='intersection_info', renderer='bson');
+    config.add_view(intersection_info, route_name='intersection_info', renderer='bson')
+    config.add_route('update_neighbours', '/intersection/{site_no}/update_neighbours')
+    config.add_route('update_neighbour_list', '/intersection/{site_no}/update_neighbours_list')
     config.add_route('intersections', '/intersections')
     config.add_route('reports', '/reports/{intersection}/{report}')
     config.add_route('accidents', '/accidents/{intersection}/{time_start}/{time_end}/{radius}')

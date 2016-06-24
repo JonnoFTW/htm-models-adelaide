@@ -19,7 +19,7 @@
 </tr>
 </thead>
 <tbody class="searchable">
-% for i in intersections:
+% for i in sorted(intersections, key=lambda x: int(x['intersection_number'])):
     <tr>
     % for j in ('intersection_number','lga','description' , 'scats_region'):
         % if j in i:

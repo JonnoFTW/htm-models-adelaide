@@ -100,7 +100,6 @@ def get_time_encoders():
         'timeOfDay': (21, 9.49)
     }]
 
-
 def createModel(intersection):
     modelDir = getModelDir(intersection)
     if CACHE_MODELS and os.path.isdir(modelDir):

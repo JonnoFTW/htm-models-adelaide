@@ -92,7 +92,7 @@ var generateIcon = function(label, bgCol) {
           title: v['intersection_number'],
           icon: v['icon'],
           infoWindow: {
-            content: '<h4>Intersection <a href="/intersection/'+v['intersection_number']+'">'+v['intersection_number']+'</a></h4><b>LGA: </b>'+v.lga+'<br><b>SCATS Region: </b>'+v.scats_region+'<br><b>Type: </b>'+v.type
+            content: '<h4>Intersection <a href="/intersection/'+v['intersection_number']+'">'+v['intersection_number']+'</a></h4><b>LGA: </b>'+v.lga+'<br><b>SCATS Region: </b>'+v.scats_region+'<br><b>Type: </b>'+v.type+'<br><b>Neighbours:</b> '+v['neighbours']
           }
       });
 
