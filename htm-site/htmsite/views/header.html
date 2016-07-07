@@ -23,6 +23,15 @@
         <link href="/assets/bootstrap-sortable/bootstrap-sortable.css" rel="stylesheet">
         <script src="/assets/bootstrap-sortable/bootstrap-sortable.js"></script>
         <script src="//cdnjs.cloudflare.com/ajax/libs/dygraph/1.1.1/dygraph-combined.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
+        <script>
+            String.prototype.format = function () {
+              var i = 0, args = arguments;
+              return this.replace(/{}/g, function () {
+                return typeof args[i] != 'undefined' ? args[i++] : '';
+              });
+            };
+        </script>
         <style type="text/css">
             body, html {
               height: 100%;

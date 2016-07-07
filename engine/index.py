@@ -74,14 +74,16 @@ def get_most_used_sensors(intersection):
     return counter
 
 
-def get_sensor_encoder(name):
+def get_sensor_encoder(name, maxval=False):
+    if maxval:
+        max_vehicles = maxval
     return {
         'fieldname': name,
         'name': name,
         'clipInput': True,
         'minval': 0.0,
         'maxval': max_vehicles,
-        'n': 50,
+        'n': 600,
         'w': 21,
         'type': 'ScalarEncoder'
     }
@@ -89,15 +91,15 @@ def get_sensor_encoder(name):
 
 def get_time_encoders():
     return [{
-        'fieldname': u'timestamp',
-        'name': u'timestamp_weekend',
-        'weekend': 21,
+        'fieldname': 'timestamp',
+        'name': 'timestamp_weekend',
+        'weekend': (51, 9),
         'type': 'DateEncoder'
-    },{
+    }, {
         'fieldname': 'timestamp',
         'name': 'timestamp_timeOfDay',
         'type': 'DateEncoder',
-        'timeOfDay': (21, 9.49)
+        'timeOfDay': (51, 9.49)
     }]
 
 def createModel(intersection):
@@ -155,6 +157,7 @@ def create_single_sensor_model(sensor, intersection):
     model.enableInference({'predictedField': sensor})
   #  print "Creating model for {}:{} in {}s on pid {}".format(intersection, sensor, time.time() - start, os.getpid())
     return model
+
 
 
 def setup_location_sensors(intersection):
@@ -296,7 +299,7 @@ def process_readings(readings, intersection, write_anomaly, progress=True, multi
             write_anomaly_out(i, anomalies, predictions)
         if _smoothing:
             previous.append(i['readings'])
-    locations_collection.find_one_and_update({'intersection_number': intersection}, {'$unset':{'running':''}})
+    locations_collection.find_one_and_update({'intersection_number': intersection}, {'$unset':{'running': ''}})
     if multi_model:
         for proc in models.values():
             proc.terminate()
@@ -389,6 +392,82 @@ def get_data():
     numpy.savetxt('3083_56.csv', data, fmt='%d', delimiter=',')
 
 
+def create_upstream_model():
+    model_params = getModelParamsFromName('3001')
+    model_params['modelParams']['sensorParams']['encoders']['upstream'] = get_sensor_encoder('upstream', 150)
+    model_params['modelParams']['sensorParams']['encoders']['downstream'] = get_sensor_encoder('downstream', 150)
+    for i in get_time_encoders():
+        model_params['modelParams']['sensorParams']['encoders'][i['name']] = i
+    import pprint
+    pp = pprint.PrettyPrinter(indent=4)
+    pp.pprint(model_params)
+    model = ModelFactory.create(model_params)
+    model.enableInference({'predictedField': 'downstream'})
+
+    return model
+
+
+def process_upstream_model(model, sensors):
+    """
+
+    :param intersections: a dict of {'upstream':{'id':3043,'sensors':[1,2,3]}, 'downstream':{'id':'3084'}}
+    :return:
+
+    """
+    anomaly_likelihood_helper = anomaly_likelihood.AnomalyLikelihood(200, 200, reestimationPeriod=10)
+    readings = readings_collection.find({'site_no':
+                                             {'$in': [sensors['downstream']['id'], sensors['upstream']['id']]}},
+                                        {'anomalies': False, 'predictions': False}, no_cursor_timeout=True). \
+        sort('datetime', pymongo.ASCENDING)
+    import nupic_anomaly_output
+    output = nupic_anomaly_output.NuPICPlotOutput("Traffic Volume from " + sensors['upstream']['id'] + " to " + sensors['downstream']['id'])
+    print "Upstream:", sensors['upstream']
+    print "Downstream:", sensors['downstream']
+
+    for x in iter(readings):
+        upstream_reading = x
+        downstream_reading = next(readings)
+        if upstream_reading['site_no'] != sensors['downstream']['id']:
+            downstream_reading, upstream_reading = upstream_reading, downstream_reading
+        if upstream_reading['datetime'] != downstream_reading['datetime']:
+            print "Datetime mismatch"
+            continue
+        timestamp = downstream_reading['datetime']
+
+        upstream_total = sum((upstream_reading['readings'][s] for s in sensors['upstream']['sensors']))
+        downstream_total = sum((downstream_reading['readings'][s] for s in sensors['downstream']['sensors']))
+        fields = {
+            "timestamp": timestamp,
+            'downstream': downstream_total,
+            'upstream': upstream_total
+        }
+        result = model.run(fields)
+        prediction = result.inferences["multiStepBestPredictions"][1]
+        anomaly_score = result.inferences["anomalyScore"]
+
+        likelihood = anomaly_likelihood_helper.anomalyProbability(downstream_total, anomaly_score, timestamp)
+        # print "input", downstream_total, "Pred", prediction, "anomaly_score", anomaly_score, "likelihood", likelihood
+        output.write(timestamp, downstream_total, prediction, anomaly_score)
+#
+
+
+
+def run_upstream_model(intersections):
+    model = create_upstream_model()
+    downstream = locations_collection.find_one({'intersection_number': intersections[0]})
+    sensors = {
+        'downstream': {
+            'id': downstream['intersection_number'],
+            'sensors': map(lambda x: str(x*8), downstream['neighbours_sensors'][intersections[1]]['to'])
+        },
+        'upstream': {
+            'id': intersections[1],
+            'sensors': map(lambda x: str(x*8), downstream['neighbours_sensors'][intersections[1]]['from'])
+        }
+    }
+    process_upstream_model(model, sensors)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=DESCRIPTION)
     parser.add_argument('--search', help='Perform a parameter search', action='store_true')
@@ -402,7 +481,13 @@ if __name__ == "__main__":
                                                 'many otherwise it will do all of them', action='store_true')
     parser.add_argument('--multi-model', help="Use a model per sensor", action='store_true')
     parser.add_argument('--smooth', type=int, help="Smooth the readings values using a mean filter with given size", default=0)
+    parser.add_argument('--upstream-model', help="Make a model that analyses the traffic between two", default='')
     args = parser.parse_args()
+    if args.upstream_model:
+        intersections = args.upstream_model.split(',')
+        run_upstream_model(intersections)
+        raw_input("exit")
+        sys.exit()
     if args.search:
         print "Searching for good encoder params"
         get_data()

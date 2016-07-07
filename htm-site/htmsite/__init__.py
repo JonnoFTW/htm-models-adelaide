@@ -293,7 +293,7 @@ def show_map(request):
     """
     intersections = _get_intersections()
     return render_to_response(
-        'views/map.mak',
+        'views/map.mako',
         {'intersections': json.dumps(list(intersections))
          },
         request=request
@@ -417,6 +417,8 @@ def get_accident_near_json(request):
 
 
 def validate_nodes(nodes):
+    if len(nodes) == 0:
+        return True 
     with _get_mongo_client() as client:
         locs = client[mongo_database]['locations']
         ns = locs.find({'intersection_number': {'$in': nodes}})
