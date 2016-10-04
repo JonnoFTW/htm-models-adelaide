@@ -185,7 +185,7 @@ class NuPICPlotOutput(NuPICOutput):
     plt.title(self.name)
     plt.ylabel('Downstream Traffic Volume')
     plt.xlabel('Date')
-    plt.ylim((0.0, 500))
+
     self._anomalyGraph = fig.add_subplot(gs[1])
 
     plt.ylabel('Percentage')

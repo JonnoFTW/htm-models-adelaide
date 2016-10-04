@@ -15,6 +15,7 @@ htmsite/renderers.py
 htmsite/tests.py
 htmsite/assets/favicon.ico
 htmsite/assets/fontawesome-markers.min.js
+htmsite/assets/missing.png
 htmsite/assets/site.css
 htmsite/assets/bootstrap-sortable/bootstrap-sortable.css
 htmsite/assets/bootstrap-sortable/bootstrap-sortable.js
@@ -23,8 +24,10 @@ htmsite/views/dygraph_weekend.js
 htmsite/views/footer.html
 htmsite/views/header.html
 htmsite/views/incidents.mak
-htmsite/views/intersection.mak
+htmsite/views/intersection.mako
 htmsite/views/list.mak
-htmsite/views/map.mak
+htmsite/views/map.mako
+htmsite/views/missing_intersection.mako
+htmsite/views/neighbour_save.mako
 htmsite/views/report.mak
 htmsite/views/time_range_panel.html

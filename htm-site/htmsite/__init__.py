@@ -3,6 +3,7 @@ from calendar import monthrange
 from collections import Counter
 from wsgiref.simple_server import make_server
 import numpy
+from pluck import pluck
 from pyramid.config import Configurator
 from pyramid.renderers import render_to_response
 from datetime import datetime, timedelta, date
@@ -90,14 +91,17 @@ def _get_neighbours(intersection):
         return list(coll.find({'intersection_number': {'$in': neighbours}}))
 
 
-def _get_intersections():
+def _get_intersections(images=True):
     """
     Get the signalised intersections for Adelaide
     :return: a cursor of documents of signalised intersections
     """
     with _get_mongo_client() as client:
         coll = client[mongo_database]['locations']
-        return coll.find({'intersection_number': {'$exists': True}}, {'_id': False})
+        exclude = {'_id': False}
+        if not images:
+            exclude['scats_diagram'] = False
+        return coll.find({'intersection_number': {'$exists': True}}, exclude)
 
 
 def get_accident_near(time_start, time_end, intersection, radius=150):
@@ -291,7 +295,7 @@ def show_map(request):
     :param request:
     :return:
     """
-    intersections = _get_intersections()
+    intersections = _get_intersections(images=True)
     return render_to_response(
         'views/map.mako',
         {'intersections': json.dumps(list(intersections))
@@ -340,7 +344,7 @@ def list_intersections(request):
         request=request
     )
 
-from pluck import pluck
+
 def get_diagrams(intersections):
     with _get_mongo_client() as client:
         db = client[mongo_database]
@@ -458,6 +462,56 @@ def update_neighbour_list(request):
                         })
         return {'success': True}
 
+
+@view_config(route_name='crash_investigate', renderer='views/crash.mako', request_method='GET')
+def investigate_crash(request):
+    intersections = _get_intersections()
+    return {
+        'intersections': json.dumps(list(intersections))
+    }
+
+
+@view_config(route_name='crash_investigate', renderer='bson', request_method='POST')
+def crash_in_polygon(request):
+    with _get_mongo_client() as client:
+        crashes_collection = client[mongo_database]['crashes']
+
+        points = request.json_body
+        # make sure it's a list of lists of floats
+        points.append(points[0])
+        crashes = crashes_collection.find({'loc': {
+            '$geoWithin': {
+                '$geometry': {
+                    'type': 'Polygon',
+                    'coordinates': [points]
+                }
+            }
+        }})
+        readings_collection = client[mongo_database]['readings']
+        crashes = list(crashes)
+        td = timedelta(minutes=5)
+        for i, crash in enumerate(crashes):
+            # find the nearest 2 intersections
+            # and get the readings for the downstream one
+            sites = client[mongo_database]['locations'].find({
+                'loc': {
+                    '$geoNear': {
+                        '$geometry': crash['loc']
+                    }
+                }
+            }).limit(2)
+            sites = pluck(list(sites), 'intersection_number')
+            readings = readings_collection.find({
+                'datetime': {'$gte': crash['datetime'] - td, '$lte': crash['datetime'] + td},
+                'site_no': {'$in': sites}
+            }).limit(6).sort([['site_no', pymongo.ASCENDING], ['datetime', pymongo.ASCENDING]])
+            crashes[i]['readings'] = list(readings)
+            crashes[i]['sites'] = sites
+    return {
+        'crashes': crashes
+    }
+
+
 def show_incidents(request):
     """
     Show the
@@ -498,6 +552,7 @@ def show_incidents(request):
 def main(global_config, **settings):
     config = Configurator()
     config.include('pyramid_mako')
+    config.include('pyramid_debugtoolbar')
     config.add_renderer('bson', 'htmsite.renderers.BSONRenderer')
     config.add_renderer('pymongo_cursor', 'htmsite.renderers.PymongoCursorRenderer')
     config.add_route('map', '/')
@@ -515,6 +570,7 @@ def main(global_config, **settings):
     config.add_route('intersections', '/intersections')
     config.add_route('reports', '/reports/{intersection}/{report}')
     config.add_route('accidents', '/accidents/{intersection}/{time_start}/{time_end}/{radius}')
+    config.add_route('crash_investigate', '/crashes')
     config.add_view(get_accident_near_json, route_name='accidents', renderer='bson')
     config.add_view(show_report, route_name='reports')
     config.add_view(list_intersections, route_name='intersections')

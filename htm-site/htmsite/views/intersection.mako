@@ -50,14 +50,12 @@
                                 <td>${k.replace('_',' ').title()}</td>
                                 <td>
                                     % if k == 'neighbours':
-                                        <select class="select2-from form-control" multiple style="width:100%"
-                                                id="neighbour-list">
-                                            % for n in v:
-                                                <option selected
-                                                        value="${n['intersection_number']}">${n['intersection_number']}</option>
-                                            % endfor
+                                        <select class="select2-from form-control" multiple style="width:100%; padding-bottom:10px" id="neighbour-list">
+                                        %for n in v:
+                                            <option selected value="${n['intersection_number']}">${n['intersection_number']}</option>
+                                        %endfor
                                         </select>
-                                        <button id="save-neighbours-list" data-id="${intersection['intersection_number']}" type="button" class="btn btn-primary">Save
+                                        <button id="save-neighbours-list" data-id="${intersection['intersection_number']}" type="button" style="margin-top:10px" class="btn btn-primary">Save
                                         </button>
                                         <div class="alert alert-success" id="list-alert" style="display:none"
                                              role="alert"> Saved!
@@ -69,7 +67,7 @@
                                             <thead>
                                             <tr>
                                                 <th style="width: 10%">Intersection</th>
-                                                <th style="width: 45%">From</th>
+##                                                 <th style="width: 45%">From</th>
                                                 <th style="width: 45%">To</th>
                                             </tr>
                                             </thead>
@@ -77,33 +75,33 @@
                                                 % for nid in pluck(intersection['neighbours'], 'intersection_number'):
                                                     <tr data-intersection="${nid}">
                                                         <td><a href="/intersection/${nid}">${nid}</a></td>
-                                                        <td>
-                                                            <select class="select2-from form-control sensor-map"
-                                                                    multiple style="width:100%"
-                                                                    data-intersection-from="${nid}">
-                                                                <% neighbour_intersection = {k['intersection_number']:k for k in intersection['neighbours']}[nid] %>
-                                                                % if 'sensors' in neighbour_intersection:
-                                                                    % for sensor in sorted(neighbour_intersection['sensors'], key=lambda x: int(x)):
-                                                                    <% sensor = int(sensor)/8 %>
-                                                                    ## sensors on the other end
-                                                                        <%
-                                                                                                                                        checked = ""
-                                                                                                                                        ##                                                               print intersection
-                                                                                                                                        if nid in intersection['neighbours_sensors'] and sensor in intersection['neighbours_sensors'][nid]['from']:
-                                                                    checked = "selected"
-                                                                    %>
-                                                                        <option ${checked}
-                                                                                value="${sensor}">${sensor}</option>
-                                                                    % endfor
-                                                                % endif
-                                                            </select>
+##                                                         <td>
+##                                                             <input class="form-control ">${v.get(nid, '')} </input>
+##                                                             <select class="select2-from form-control sensor-map"
+##                                                                     multiple style="width:100%"
+##                                                                     data-intersection-from="${nid}">
+##                                                                 <% neighbour_intersection = {k['intersection_number']:k for k in intersection['neighbours']}[nid] %>
+##                                                                 % if 'sensors' in neighbour_intersection:
+## ##                                                                     % for sensor in sorted(neighbour_intersection['sensors'], key=lambda x: int(x)):
+##                                                                     ## sensors on the other end
+##                                                                         <%
+##                                                                         checked = ""
+##                                                                         ##                                                               print intersection
+## ##                                                                         if nid in intersection['neighbours_sensors'] and sensor in intersection['neighbours_sensors'][nid]['from']:
+## ##                                                                     checked = "selected"
+##                                                                     %>
+##                                                                         <option ${checked}
+##                                                                                 value="${sensor}">${sensor}</option>
+## ##                                                                     % endfor
+##                                                                 % endif
+##                                                             </select>
                                                         <td>
                                                             ## sensors on this intersection
                                                               <select class="select2-to form-control sensor-map" multiple
                                                           style="width:100%" data-intersection-to="${nid}">
                                                             %if 'neighbours_sensors' in intersection and nid in intersection['neighbours_sensors']:
                                                                 %for sensor in sorted(intersection['sensors'], key=lambda x: int(x)):
-                                                                <% sensor = int(sensor)/8 %>
+                                                                <% sensor = int(sensor) %>
                                                                 ## sensors on the this end
                                                                  <%
                                                                                                                                  checked = ""
@@ -203,7 +201,7 @@
                                id="sensor-label">Sensor: ${pfield}<b class="caret"></b></a>
 
                             <ul class="dropdown-menu" role="menu" aria-labelledby="prediction-sensor-menu">
-                                %for sensor in popular_sensors:
+                                %for sensor in sorted(popular_sensors, key=lambda x: int(x)):
                                     <li
                                         %if int(sensor) == int(pfield):
                                             class="active"
@@ -355,7 +353,7 @@
     // highlight the ith incident in the map
     // and on the table
         ##     console.log("Select2 running");
-            $('select').select2({
+    $('select').select2({
         tags: true
     });
     mapCrash = new GMaps({
@@ -468,7 +466,7 @@
                 "data:image/png;base64,${s['scats_diagram']}",
             %else:
                 ${s['intersection_number']}:
-                "/assets/missing.png"
+                "/assets/missing.png",
             % endif
 
         % endfor
@@ -855,7 +853,7 @@
         var data = {}
         _.each(_.keys(neighbour_diagrams), function (elem) {
             data[elem] = {
-                'from': _.map($('select[data-intersection-from="' + elem + '"]').val(), stoi),
+                'from': $('input[data-intersection-from="' + elem + '"]').val(),
                 'to': _.map($('select[data-intersection-to="' + elem + '"]').val(), stoi)
             }
         });
