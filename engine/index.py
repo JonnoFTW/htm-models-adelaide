@@ -77,11 +77,13 @@ def get_most_used_sensors(intersection):
 def get_sensor_encoder(name, maxval=False):
     if maxval:
         max_vehicles = maxval
+
+    resolution = max(0.001, (max_vehicles-1)/20)
     return {
         'fieldname': name,
         'name': name,
         # 'clipInput': True,
-        'resolution': 0.8,
+        'resolution': resolution,
         # 'numBuckets': 130.0,
         # 'minval': 0.0,
         # 'maxval': 250,
@@ -107,7 +109,18 @@ def get_time_encoders():
         'name': 'timestamp_dayOfWeek',
         'type': 'DateEncoder',
         'timeOfDay': (51, 9.49)
-    }]
+    }
+  #  , {
+  #      'fieldname': 'weekOfYear',
+  #      'name': 'weekOfYear',
+  #      'minval': 0,
+  #      'maxval': 53,
+   #     'periodic': True,
+    #    'type': 'ScalarEncoder',
+     #   'n': 400,
+      #  'w': 21
+    #}
+    ]
 
 def createModel(intersection):
     modelDir = getModelDir(intersection)
@@ -395,16 +408,18 @@ def get_data():
     numpy.savetxt('3083_56.csv', data, fmt='%d', delimiter=',')
 
 
-def create_upstream_model():
+def create_upstream_model(max_input, steps=None):
     """
     A model where the link has its downstream readings summed
     :return:
     """
     model_params = getModelParamsFromName('3104_3044', clear=True)
     # model_params['modelParams']['sensorParams']['encoders']['upstream'] = get_sensor_encoder('upstream', 150)
-    model_params['modelParams']['sensorParams']['encoders']['downstream'] = get_sensor_encoder('downstream', 250)
+    model_params['modelParams']['sensorParams']['encoders']['downstream'] = get_sensor_encoder('downstream', max_input)
     for i in get_time_encoders():
         model_params['modelParams']['sensorParams']['encoders'][i['name']] = i
+    if steps is not None:
+        model_params['modelParams']['clParams']['steps'] = ','.join(map(str, steps))
     import pprint
     pp = pprint.PrettyPrinter(indent=4)
     pp.pprint(model_params)
@@ -563,21 +578,20 @@ def run_upstream_model(intersections, args):
 def process_downstream_model(intersections, model, intersection, args):
     readings = readings_collection.find({'site_no': intersections[0]})
     sensors = intersection['neighbours_sensors'][intersections[1]]['to']
-    # import csv
-    # with open('lane_data.csv', 'w') as outfile:
-    #     writer = csv.DictWriter(outfile, fieldnames=['timestamp']+[str(sensor) for sensor in sensors])
-    #     writer.writeheader()
-    for r in readings:
-        lanes = {str(sensor): r['readings'][str(sensor)] for sensor in sensors}
-        fields = {
-            'timestamp': r['datetime'],
-            'lanes': lanes
-        }
-        # writer.writerow(fields)
-        print fields
+    import csv
+    with open('lane_data_{}_{}.csv'.format(intersections[0], intersections[1]), 'w') as outfile:
+        writer = csv.DictWriter(outfile, fieldnames=['timestamp']+[str(sensor) for sensor in sensors])
+        writer.writeheader()
+        print "Writing to " + outfile.name
+        for r in readings:
+            lanes = {str(sensor): r['readings'][str(sensor)] for sensor in sensors}
 
-        result = model.run(fields)
-        print result
+            lanes['timestamp'] = r['datetime']
+            writer.writerow(lanes)
+            # print fields
+
+            # result = model.run(fields)
+            # print result
 
 
 def run_downstream_model(args):
