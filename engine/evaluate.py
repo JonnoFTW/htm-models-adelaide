@@ -57,12 +57,14 @@ def run_data(fname, limit=None, sensors=None):
     it = iter(data)
     for row in it:
         progress.update()
+        if row['downstream'] < 300:
+            result = model.run(row)
+            for i in steps:
+                step_predictions[i].append(result.inferences["multiStepBestPredictions"][i])
 
-        # result = model.run(row)
-        # for i in steps:
-        #     step_predictions[i].append(result.inferences["multiStepBestPredictions"][i])
         if type(limit) is datetime and row['timestamp'] >= limit:
             break
+
         row_count += 1
     return step_predictions, data, model, it, row_count, len(data)
 
@@ -73,33 +75,34 @@ if __name__ == "__main__":
         print("Running ", i)
         fname = i.split('/')[-1]
         predictions, data, model, it, row_count, data_len = run_data(i, limit=datetime(2013, 4, 23), sensors=[5])
-        model = model.load('/scratch/model_store/3002_model_sensor_5')
+
+        model.save('/scratch/model_store/3002_model_sensor_5')
         # turn the data into numpy arrays
-        # split_idx = int(len(data) * 0.4)
-        # flow_values = np.array(pluck(data[split_idx:], 'downstream'))
-        # print()
-        # # print (predictions)
-        #
-        # predictions = {
-        #     k: np.array(v[split_idx:]) for k, v in predictions.items()
-        # }
-        # print()
-        #
-        # table = []
-        # print(' & '.join(['step', 'geh', 'mape', 'rmse'])+' \\\\')
-        # for step in steps:
-        #     # true values
-        #     stepped_vals = flow_values[step:len(predictions)]
-        #     # predicted  values
-        #     pred_vals = predictions[step][:-step] + eps
-        #     table.append(OrderedDict([
-        #         ('steps', step),
-        #         ('geh',  geh(stepped_vals, pred_vals)),
-        #         ('mape', mape(stepped_vals, pred_vals)),
-        #         ('rmse', rmse(stepped_vals, pred_vals))
-        #     ]))
-        # print(tabulate.tabulate(table, 'keys', 'latex'))
-        #
+        split_idx = int(len(data) * 0.4)
+        flow_values = np.array(pluck(data[split_idx:], 'downstream'))
+        print()
+        # print (predictions)
+
+        predictions = {
+            k: np.array(v[split_idx:]) for k, v in predictions.items()
+        }
+        print()
+
+        table = []
+        print(' & '.join(['step', 'geh', 'mape', 'rmse'])+' \\\\')
+        for step in steps:
+            # true values
+            stepped_vals = flow_values[step:len(predictions)]
+            # predicted  values
+            pred_vals = predictions[step][:-step] + eps
+            table.append(OrderedDict([
+                ('steps', step),
+                ('geh',  geh(stepped_vals, pred_vals)),
+                ('mape', mape(stepped_vals, pred_vals)),
+                ('rmse', rmse(stepped_vals, pred_vals))
+            ]))
+        print(tabulate.tabulate(table, 'keys', 'latex'))
+
         print("Loading matplotlib")
         import matplotlib.pyplot as plt
 
@@ -117,10 +120,10 @@ if __name__ == "__main__":
             true_x.append(row['timestamp'])
             true_y.append(row['downstream'])
             pred_y.append(preds.inferences["multiStepBestPredictions"][1])
-
-        np_ty = np.array(true_y)
-        np_py = np.array(pred_y)
-        print("GEH: ",  geh(np_ty, np_py))
+        np_tx = np.array(true_x)[1:]
+        np_ty = np.array(true_y)[1:]
+        np_py = np.array(pred_y)[:-1]
+        print("GEH:  ",  geh(np_ty, np_py))
         print("MAPE: ", mape(np_ty, np_py))
         print("RMSE: ", rmse(np_ty, np_py))
 
@@ -129,8 +132,8 @@ if __name__ == "__main__":
         print("True x:", len(true_x))
         print("True y:", len(true_x))
         print("Pred y:", len(true_x))
-        plt.plot(true_x[1:], true_y[1:], 'b-', label='Readings')
-        plt.plot(true_x[1:], pred_y[:-1], 'r-', label='Predictions')
+        plt.plot(true_x, true_y, 'b-', label='Readings')
+        plt.plot(true_x, pred_y, 'r-', label='Predictions')
         df = "%A %d %B, %Y"
         plt.title("3002: Traffic Flow from {} to {}".format(true_x[0].strftime(df), true_x[-1].strftime(df)))
         plt.legend()

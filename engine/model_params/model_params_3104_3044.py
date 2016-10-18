@@ -14,7 +14,7 @@ MODEL_PARAMS = \
                                        u'autoDetectThreshold': None,
                                        u'autoDetectWaitRecords': None},
                      'clParams': {'alpha': 0.050050000000000004,
-                                  'clVerbosity': 0,
+                                  'verbosity': 0,
                                   'regionName': 'CLAClassifierRegion',
                                   'steps': '1,3,6,9,12'},
                      'clEnable': True,
