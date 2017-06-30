@@ -2,8 +2,8 @@ from sklearn.utils import check_array
 import numpy as np
 
 
-def geh(y_true, y_pred):
-    return np.sqrt(2*np.power(y_pred - y_true, 2)/(y_pred + y_true)).mean(axis=0)
+def geh(y_true, y_pred, axis=0):
+    return np.sqrt(2*np.power(y_pred - y_true, 2)/(y_pred + y_true)).mean(axis=axis)
 
 def mean_absolute_percentage_error(y_true, y_pred):
     """
@@ -25,8 +25,8 @@ def mean_absolute_percentage_error(y_true, y_pred):
     return np.mean(np.abs((y_true - y_pred) / y_true)) * 100
 mape = mean_absolute_percentage_error
 
-def rmse(y_true, y_pred):
-    return np.sqrt(((y_pred - y_true) ** 2).mean(axis=0))
+def rmse(y_true, y_pred, axis=0):
+    return np.sqrt(((y_pred - y_true) ** 2).mean(axis=axis))
 
 
 def MASE(training_series, testing_series, prediction_series):

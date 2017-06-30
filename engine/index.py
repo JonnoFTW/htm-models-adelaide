@@ -74,11 +74,11 @@ def get_most_used_sensors(intersection):
     return counter
 
 
-def get_sensor_encoder(name, maxval=False):
+def get_sensor_encoder(name, maxval=False, buckets=20):
     if maxval:
         max_vehicles = maxval
 
-    resolution = max(0.001, (max_vehicles-1)/20)
+    resolution = max(0.001, (max_vehicles-1)/buckets)
     return {
         'fieldname': name,
         'name': name,
@@ -103,7 +103,7 @@ def get_time_encoders():
         'fieldname': 'timestamp',
         'name': 'timestamp_timeOfDay',
         'type': 'DateEncoder',
-        'timeOfDay': (51, 9.49)
+        'timeOfDay': (101, 9.49)
     }, {
         'fieldname': 'timestamp',
         'name': 'timestamp_dayOfWeek',
