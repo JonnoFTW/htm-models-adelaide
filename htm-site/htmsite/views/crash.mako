@@ -1,4 +1,4 @@
-<%include file="header.html"/>
+<%include file="header.mako"/>
 <div class="container" style="padding-top: 30px">
     <div class="row">
         <div class="col-lg-6">
@@ -176,7 +176,7 @@
             map.addMarker({
                 lat: v.loc.coordinates[1],
                 lng: v.loc.coordinates[0],
-                icon: generateIcon(v['intersection_number'], colors[v.scats_region]),
+                icon: generateIcon(v['site_no'], colors[v.scats_region]),
             });
 
         });

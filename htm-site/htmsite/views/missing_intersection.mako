@@ -1,4 +1,4 @@
-<%include file="header.html"/>
+<%include file="header.mako"/>
 <div class="container">
     <div class="row">
         <div class="col-lg-12">

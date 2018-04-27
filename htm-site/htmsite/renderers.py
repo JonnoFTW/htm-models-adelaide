@@ -2,6 +2,18 @@ from bson import json_util
 import json
 
 
+class BaseRenderer:
+    content_type = 'text/html'
+
+    def _set_ct(self, system):
+        request = system.get('request')
+        if request is not None:
+            response = request.response
+            ct = response.content_type
+            if ct == response.default_content_type:
+                response.content_type = self.content_type
+
+
 class BSONRenderer:
     def __init__(self, info):
         """ Constructor: info will be an object having the
@@ -21,4 +33,22 @@ class PymongoCursorRenderer:
         pass
 
     def __call__(self, value, system):
-        return '['+(','.join([json.dumps(i,default=json_util.default) for i in value]))+']'
+        return json_util.dumps(value, separators=(',', ':'))
+        # return '['+(','.join([json.dumps(i,default=json_util.default) for i in value]))+']'
+
+
+class ZipRenderer:
+    content_type = 'application/zip'
+
+    def __init__(self, info):
+        pass
+
+    def __call__(self, data, system):
+        request = system.get('request')
+        if request is not None:
+            response = request.response
+            ct = response.content_type
+            if ct == response.default_content_type:
+                response.content_type = self.content_type
+
+        return data.getvalue()

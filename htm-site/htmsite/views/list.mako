@@ -1,4 +1,4 @@
-<%include file="header.html"/>
+<%include file="header.mako"/>
 <div class="container" id="list_c">
 <div class="row" style="padding-top:20px">
 <div class="col-lg-12">
@@ -19,18 +19,18 @@
 </tr>
 </thead>
 <tbody class="searchable">
-% for i in sorted(intersections, key=lambda x: int(x['intersection_number'])):
+% for i in sorted(intersections, key=lambda x: int(x['site_no'])):
     <tr>
-    % for j in ('intersection_number','lga','description' , 'scats_region'):
+    % for j in ('site_no','lga','description' , 'scats_region'):
         % if j in i:
         <td>${i[j]}</td>
         % else:
             <td></td>
         % endif
     % endfor
-    <td><a href="/?site=${i['intersection_number']}"><button type="button" class="btn btn-primary btn-lg">
+    <td><a href="/?site=${i['site_no']}"><button type="button" class="btn btn-primary btn-lg">
     <span class="glyphicon glyphicon-map-marker"></span></button></a></td>
-    <td><a href="/intersection/${i['intersection_number']}"> <button type="button" class="btn btn-primary btn-lg">
+    <td><a href="/intersection/${i['site_no']}"> <button type="button" class="btn btn-primary btn-lg">
     <span class="glyphicon glyphicon-signal"></span></button></a></td>
     <td>
         <ul class="nav nav-pills" role="tablist">
@@ -40,7 +40,7 @@
                 </a>
                 <ul class="dropdown-menu">
                   % for j in reports:
-                    <li><a href="/reports/${i['intersection_number']}/${j.lower().replace(' ','_')}">${j}</a></li>
+                    <li><a href="/reports/${i['site_no']}/${j.lower().replace(' ','_')}">${j}</a></li>
                   % endfor
                 </ul>
             </li>

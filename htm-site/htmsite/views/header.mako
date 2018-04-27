@@ -10,7 +10,7 @@
         <meta name="description" content="A basic template for Bootstrap 3.0" />
          <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
         <script type='text/javascript' src="//netdna.bootstrapcdn.com/bootstrap/3.1.1/js/bootstrap.min.js"></script>
-        <script src="https://maps.googleapis.com/maps/api/js?key=${GMAPS_API_KEY}"></script>
+        <script src="https://maps.googleapis.com/maps/api/js?key=${request.registry.settings['gmaps_api_key']}"></script>
         <script src="//cdnjs.cloudflare.com/ajax/libs/gmaps.js/0.4.19/gmaps.js"></script>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.3/css/select2.min.css">
         <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.3/js/select2.full.min.js"></script>
@@ -59,6 +59,9 @@
             span.active {
                 font-weight: bold;
             }
+            .modal-huge {
+                width: 95%;
+            }
         </style>
     </head>
     <body>
@@ -77,7 +80,14 @@
                 <li><a href="/intersections">Intersections</a></li>
                 <li><a href="/incidents">Incidents</a></li>
                 <li><a href="/crashes">Crashes</a></li>
+                <li><a href="/export">Export</a></li>
               </ul>
+                <ul class="nav navbar-nav navbar-right">
+                %if request.authenticated_userid:
+                    <li class="nav-item"><a class="nav-link" href="/logout">Logout</a></li>
+                %endif
+
+            </ul>
             </div><!--/.nav-collapse -->
           </div>
         </div>

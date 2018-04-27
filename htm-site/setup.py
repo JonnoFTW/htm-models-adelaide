@@ -14,7 +14,10 @@ requires = [
     'pyramid_chameleon',
     'pyramid_debugtoolbar',
     'waitress',
-    'geopy'
+    'geopy',
+    'ldap3',
+    'numpy',
+    'bcrypt'
     ]
 
 setup(name='htm-site',

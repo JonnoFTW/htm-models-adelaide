@@ -1,4 +1,4 @@
-<%include file="header.html"/>
+<%include file="header.mako"/>
 
 <%
     from bson import json_util
@@ -10,7 +10,7 @@
 
     has_anything = scores_count > 0
     pfield = str(intersection['sensors'][0])
-    if isinstance(intersection['sensors'], basestring):
+    if isinstance(intersection['sensors'], str):
   popular_sensors = []
   intersection['sensors'] = []
     else:
@@ -22,7 +22,7 @@
 <script type="text/javascript" src="//cdn.jsdelivr.net/bootstrap.daterangepicker/2/daterangepicker.js"></script>
 <script type="text/javascript" src="/assets/fontawesome-markers.min.js"></script>
 <div class="container">
-    <h1>Intersection: ${intersection['intersection_number']}</h1>
+    <h1>Intersection: ${intersection['site_no']}</h1>
     <div class="row">
         <div class="col-lg-6">
             <div class="panel panel-default">
@@ -52,10 +52,10 @@
                                     % if k == 'neighbours':
                                         <select class="select2-from form-control" multiple style="width:100%; padding-bottom:10px" id="neighbour-list">
                                         %for n in v:
-                                            <option selected value="${n['intersection_number']}">${n['intersection_number']}</option>
+                                            <option selected value="${n['site_no']}">${n['site_no']}</option>
                                         %endfor
                                         </select>
-                                        <button id="save-neighbours-list" data-id="${intersection['intersection_number']}" type="button" style="margin-top:10px" class="btn btn-primary">Save
+                                        <button id="save-neighbours-list" data-id="${intersection['site_no']}" type="button" style="margin-top:10px" class="btn btn-primary">Save
                                         </button>
                                         <div class="alert alert-success" id="list-alert" style="display:none"
                                              role="alert"> Saved!
@@ -72,7 +72,7 @@
                                             </tr>
                                             </thead>
                                             <tbody id="neighbour-sensors">
-                                                % for nid in pluck(intersection['neighbours'], 'intersection_number'):
+                                                % for nid in pluck(intersection['neighbours'], 'site_no'):
                                                     <tr data-intersection="${nid}">
                                                         <td><a href="/intersection/${nid}">${nid}</a></td>
 ##                                                         <td>
@@ -80,7 +80,7 @@
 ##                                                             <select class="select2-from form-control sensor-map"
 ##                                                                     multiple style="width:100%"
 ##                                                                     data-intersection-from="${nid}">
-##                                                                 <% neighbour_intersection = {k['intersection_number']:k for k in intersection['neighbours']}[nid] %>
+##                                                                 <% neighbour_intersection = {k['site_no']:k for k in intersection['neighbours']}[nid] %>
 ##                                                                 % if 'sensors' in neighbour_intersection:
 ## ##                                                                     % for sensor in sorted(neighbour_intersection['sensors'], key=lambda x: int(x)):
 ##                                                                     ## sensors on the other end
@@ -104,12 +104,11 @@
                                                                 <% sensor = int(sensor) %>
                                                                 ## sensors on the this end
                                                                  <%
-                                                                                                                                 checked = ""
-                                                                                                                                 if  nid in intersection['neighbours_sensors'] and sensor in intersection['neighbours_sensors'][nid]['to']:
+                                                                 checked = ""
+                                                                 if  nid in intersection['neighbours_sensors'] and sensor in intersection['neighbours_sensors'][nid]['to']:
                                                                     checked = "selected"
                                                                 %>
-                                                                    <option ${checked}
-                                                                            value="${sensor}">${sensor}</option>
+                                                                    <option ${checked} value="${sensor}">${sensor}</option>
                                                                 % endfor
                                                             %endif
                                                         </select>
@@ -131,6 +130,40 @@
                                                 %endif
                                             ><a href="#observations" class="sensor-swapper">${sensor}</a></span>
                                         %endfor
+                                    % elif k == 'strategic_inputs':
+                                        <p>Match with strategic_input field in scats_sm data</p>
+                                            % for si_config in v:
+##                                                 <div class="panel list-group">
+##                                                     <div class="list-group-item">
+##
+##
+##                                                     </div>
+##                                                 </div>
+                                                ${si_config['date']}
+                                                 <table class="table table-condensed">
+                                                    <thead>
+                                                    <tr>
+                                                        <th style="width: 10%">SI</th>
+                                                        <th style="width: 45%">Sensors</th>
+                                                    </tr>
+                                                    </thead>
+                                                    <tbody id="strategic-inputs">
+                                                        % for si_id, si_data in si_config['si'].items():
+                                                            <tr>
+                                                                <td>${si_id}</td>
+                                                                <td>
+                                                                    % for d in si_data['sensors']:
+                                                                        <a href="#observations" class="sensor-swapper">${d}</a>
+                                                                    % endfor
+                                                                    %if si_data['site_no'] != intersection['site_no']:
+                                                                            (${si_data['site_no']})
+                                                                    %endif
+                                                                </td>
+                                                            </tr>
+                                                        % endfor
+                                                    </tbody>
+                                                 </table>
+                                         % endfor
                                     % else:
                                         ${v}
                                     % endif
@@ -146,7 +179,7 @@
 
                     <div id="sm" class="sublinks panel-collapse collapse">
                         % for i in reports:
-                            <a href="/reports/${intersection['intersection_number']}/${i.replace(' ','_').lower()}"
+                            <a href="/reports/${intersection['site_no']}/${i.replace(' ','_').lower()}"
                                class="list-group-item small">${i}</a>
                         %endfor
                     </div>
@@ -160,12 +193,14 @@
         </div>
         <div class="col-lg-6">
             <div class="panel panel-default">
-                <div class="panel-heading" id="observations">
+                <div class="panel-heading" id="neighbour-prev">
                     <i class="fa fa-line-chart fa-fw"></i>
                     Neighbour Preview
                 </div>
                 <div class="panel-body">
-                    <img id="neighbour-preview" class="img-responsive" src=""/>
+                    <a href="#" class="pop">
+                        <img id="neighbour-preview" class="img-responsive" src=""/>
+                    </a>
                 </div>
             </div>
         </div>
@@ -176,8 +211,23 @@
                 </div>
                 <div class="panel-body">
                     ##                         <div style="height:600px">
-                                            % if 'scats_diagram' in intersection:
-                    <img class="img-responsive" src="data:image/png;base64,${intersection['scats_diagram']}">
+                    % if 'scats_diagram' in intersection:
+##                         <div class="tiles">
+##                        <div class="tile" data-scale="2.4" data-image="data:image/png;base64,${intersection['scats_diagram']}"></div></div>
+                        <a href="#" class="pop">
+                            <img class="img-responsive" src="data:image/png;base64,${intersection['scats_diagram']}">
+                        </a>
+                        <div class="modal fade" id="imagemodal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+                          <div class="modal-dialog modal-huge">
+                            <div class="modal-content">
+                              <div class="modal-body">
+                                <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+                                <img src="" class="imagepreview" style="width: 100%;" >
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
                 %else:
                     <img class="img-responsive" src="/assets/missing.png">
                 % endif
@@ -197,9 +247,14 @@
                         <i class="fa fa-line-chart fa-fw"></i>
                         Observation <i class="fa fa-spinner fa-pulse loaderImage"></i>
                         <div class="dropdown pull-right">
+                            <select id="sensors-select" multiple>
+                                %for sensor in range(1,25):
+                                    <option value="${sensor}">${sensor}</option>
+                                %endfor
+                            </select>
                             <a href="#" class="dropdown-toggle" data-toggle="dropdown"
                                id="sensor-label">Sensor: ${pfield}<b class="caret"></b></a>
-
+                            <label for="observation-sum">Sum</label><input type="radio" name="observation-sum"/>
                             <ul class="dropdown-menu" role="menu" aria-labelledby="prediction-sensor-menu">
                                 %for sensor in sorted(popular_sensors, key=lambda x: int(x)):
                                     <li
@@ -379,7 +434,7 @@
         var mainMarker = {
             lat: lat,
             lng: lng,
-            title: '${intersection['intersection_number']}'
+            title: '${intersection['site_no']}'
         };
         mapCrash.removeMarkers();
         mapCrash.addMarker(mainMarker);
@@ -387,10 +442,10 @@
             mapCrash.addMarker({
                 lat: ${i['loc']['coordinates'][1]},
                 lng: ${i['loc']['coordinates'][0]},
-                title: '${i['intersection_number']}',
+                title: '${i['site_no']}',
                 infoWindow: {
-                    content: '<a href="/intersection/'+${i['intersection_number']}+
-                    '">'+${i['intersection_number']}+'</a>'
+                    content: '<a href="/intersection/'+${i['site_no']}+
+                    '">'+${i['site_no']}+'</a>'
                 }
             });
         %endfor
@@ -462,10 +517,10 @@
     var neighbour_diagrams = {
         % for s in intersection['neighbours']:
             % if 'scats_diagram' in s:
-                ${s['intersection_number']}:
+                ${s['site_no']}:
                 "data:image/png;base64,${s['scats_diagram']}",
             %else:
-                ${s['intersection_number']}:
+                ${s['site_no']}:
                 "/assets/missing.png",
             % endif
 
@@ -485,9 +540,9 @@
                 'to': to,
             };
             $('.loaderImage').show();
-            $.getJSON('/get_readings_anomaly_${intersection['intersection_number']}.json', args,
+            $.getJSON('/get_readings_anomaly_${intersection['site_no']}.json', args,
                     function (data) {
-                        if (data.length == 0) {
+                        if (data.length === 0) {
                             // no data!
                             console.log('No data');
                         } else {
@@ -599,7 +654,7 @@
             </div>').height('0');
                 } else {
                     anomalyChart = new Dygraph(document.getElementById('anomaly-chart'), arReadings.aData, {
-                        title: 'Anomaly value for intersection ${intersection['intersection_number']}',
+                        title: 'Anomaly value for intersection ${intersection['site_no']}',
                         ylabel: 'Anomaly',
                         xlabel: 'Date',
                         anomaly: {
@@ -743,13 +798,11 @@
 
         };
         $(document).ready(function () {
-            if (${scores_count}>
-            0
-            )
-            setupDygraphs();
+            if (${scores_count}>0)
+                setupDygraphs();
             $('.shift-data').click(function (e) {
                 // determine if we are older or newer
-                var older = $(this).text() == 'Older';
+                var older = $(this).text() === 'Older';
                 var from, to;
                 if (older) {
                     to = predictionChart.getValue(0, 0) / 1000; // lowest reading
@@ -773,7 +826,7 @@
                     to = predictionChart.getValue(predictionChart.numRows() - 1, 0) / 1000;
                     loadData(from, to, setChartsFromMake);
 
-                    $.getJSON('/intersection_${intersection['intersection_number']}.json', function (data) {
+                    $.getJSON('/intersection_${intersection['site_no']}.json', function (data) {
                         if (!data.hasOwnProperty('running')) {
                             console.log("Stopping reloading");
                             clearInterval(intervalId);
@@ -829,6 +882,7 @@
             if (img === undefined)
             img = '/assets/missing.png';
         $('#neighbour-preview').attr('src', img);
+
     }, function (e) {
         ;
     });
@@ -839,7 +893,7 @@
             end = $('input[name="daterange"]').data('daterangepicker').endDate.unix();
         }
         console.log("Updating incidents in radius ", radius, "from ", start, " to ", end);
-        $.getJSON('/accidents/${intersection['intersection_number']}/' + start + '/' + end + '/' + radius, function (data) {
+        $.getJSON('/accidents/${intersection['site_no']}/' + start + '/' + end + '/' + radius, function (data) {
             // repopulate table and markers
             incidents = data[0];
             radius = data[1];
@@ -859,7 +913,7 @@
         });
         console.log(data);
         $.ajax({
-            url: '/intersection/${intersection["intersection_number"]}/update_neighbours',
+            url: '/intersection/${intersection["site_no"]}/update_neighbours',
             type: 'POST',
             data: JSON.stringify(data),
             contentType: "application/json; charset=utf-8",
@@ -869,6 +923,16 @@
             }
         })
     });
+
+   $('.pop').on('click', function() {
+			$('.imagepreview').attr('src', $(this).find('img').attr('src'));
+			$('#imagemodal').modal('show').on('click', function() {
+                $('#imagemodal').modal('hide');
+            });
+
+		});
+
+
 <%include file="neighbour_save.mako" />
 
 </script>

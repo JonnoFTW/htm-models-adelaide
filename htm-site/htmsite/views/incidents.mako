@@ -1,4 +1,4 @@
-<%include file="header.html"/>
+<%include file="header.mako"/>
 
 <div class="container" id="list_c">
 <div class="row" style="padding-top:20px">
@@ -29,7 +29,7 @@ count_other = 0
     %if len(i[1]):
     <tr>
         <td>${i[0]['datetime'].strftime(date_format)}</td>
-        <td><a href="/intersection/${i[2]['intersection_number']}">${i[2]['intersection_number']}</a></td>
+        <td><a href="/intersection/${i[2]['site_no']}">${i[2]['site_no']}</a></td>
         <td>${"%.2f" %i[3]}m</td>
         <td>${i[0]['App_Error']}</td>
         <%

@@ -1,4 +1,4 @@
-<%include file="header.html"/>
+<%include file="header.mako"/>
 <div class="container" id="map_c">
 
     <div id="map"></div>
@@ -86,7 +86,7 @@
         var locations = ${intersections |n };
 
         var makeSelectBox = function (intersection) {
-            var iid = intersection['intersection_number'];
+            var iid = intersection['site_no'];
             var out = '<select class="select2-from form-control" multiple style="width:150px" id="neighbour-list-{}">'.format(iid);
             if (_.has(intersection, 'neighbours'))
                 $.each(intersection['neighbours'], function (i, v) {
@@ -102,10 +102,10 @@
                 var marker = map.addMarker({
                     lat: v['loc']['coordinates'][1],
                     lng: v['loc']['coordinates'][0],
-                    title: v['intersection_number'],
-                    icon: generateIcon(v['intersection_number'], colors[v.scats_region]),
+                    title: v['site_no'],
+                    icon: generateIcon(v['site_no'], colors[v.scats_region]),
                     infoWindow: {
-                        content: '<h4>Intersection <a href="/intersection/' + v['intersection_number'] + '">' + v['intersection_number'] +
+                        content: '<h4>Intersection <a href="/intersection/' + v['site_no'] + '">' + v['site_no'] +
                         '</a></h4><b>LGA: </b>' + v.lga + '<br><b>SCATS Region: </b>' + v.scats_region + '<br><b>Type: </b>' +
                         v.type + '<br><b>Neighbours:</b>' + makeSelectBox(v)
                     }
