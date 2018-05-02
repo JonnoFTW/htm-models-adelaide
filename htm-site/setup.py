@@ -11,7 +11,6 @@ with open(os.path.join(here, 'CHANGES.txt')) as f:
 requires = [
     'pyramid',
     'pyramid_mako',
-    'pyramid_chameleon',
     'pyramid_debugtoolbar',
     'waitress',
     'geopy',
@@ -21,7 +20,7 @@ requires = [
     ]
 
 setup(name='htm-site',
-      version='0.0',
+      version='0.1',
       description='htm-site',
       long_description=README + '\n\n' + CHANGES,
       classifiers=[

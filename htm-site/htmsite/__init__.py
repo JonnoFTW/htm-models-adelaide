@@ -15,7 +15,7 @@ from pyramid.config import Configurator
 def main(global_config, **settings):
     db_url = urlparse(settings['mongo_uri'])
     config = Configurator(settings=settings)
-
+    config.include('pyramid_mako')
     def add_db(request):
         conn = MongoClient(db_url.geturl(),
                            serverSelectionTimeoutMS=10000,

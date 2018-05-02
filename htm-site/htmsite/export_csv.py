@@ -3,7 +3,6 @@ from pyramid.view import view_config
 import zipfile
 from datetime import datetime
 import csv
-from bson import json_util
 from io import BytesIO, StringIO
 import base64
 
@@ -52,7 +51,7 @@ def export_csv_render(request):
             img64 = site['scats_diagram']
             img_io = BytesIO()
             img_io.write(base64.b64decode(img64))
-            zip_file_obj.writestr(zipfile.ZipInfo(f'{site["site_no"]}.png', date_time=now), img_io.getvalue())
+            zip_file_obj.writestr(zipfile.ZipInfo('{}.png'.format(site["site_no"]), date_time=now), img_io.getvalue())
 
     request.response.content_type = 'application/zip'
     request.response.content_disposition = 'attachment;filename=scats_vs_export_{}.zip'.format(
