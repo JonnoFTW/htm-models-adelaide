@@ -2,7 +2,8 @@ from datetime import datetime
 
 import pymongo
 from pyramid.view import view_config
-
+import logging
+log = logging.getLogger(__name__)
 
 
 date_format = '%H/%M/%D'
@@ -44,7 +45,7 @@ def du(unix):
 def validate_nodes(nodes, request):
     if len(nodes) == 0:
         return True
-    ns = request.db.locations.distinct('site_no',{'site_no': {'$in': nodes}})
+    ns = request.db.locations.distinct('site_no', {'site_no': {'$in': nodes}})
     return len(ns) == len(nodes)
 
 
@@ -70,14 +71,15 @@ def update_neighbour_list(request):
     data = request.POST['neighbours'].split(',')
     # print data
     # print data
-    # if not validate_nodes(data, request):
-    #     return {'error': 'Invalid nodes'}
+    if not validate_nodes(data, request):
+        return {'error': 'Invalid nodes'}
     # return
-    locs.update_one({'site_no': request.matchdict['site_no']},
+    res = locs.update_one({'site_no': request.matchdict['site_no']},
                     {
                         '$set': {
                             'neighbours': data
                         }
                     })
+    log.debug(res.raw_result)
     return {'success': True}
 

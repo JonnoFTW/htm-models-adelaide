@@ -1,21 +1,32 @@
 from pyramid.authentication import AuthTktAuthenticationPolicy
 from pyramid.authorization import ACLAuthorizationPolicy
 from pyramid.security import unauthenticated_userid
+import logging
+log = logging.getLogger(__name__)
 
-try:
-    # for python 2
-    from urlparse import urlparse
-except ImportError:
-    # for python 3
-    from urllib.parse import urlparse
+import json
+from urllib.parse import urlparse
 from pymongo import MongoClient
 from pyramid.config import Configurator
 
 
 def main(global_config, **settings):
-    db_url = urlparse(settings['mongo_uri'])
+
+    import os
+    if 'mongo_uri' in settings:
+        db_url = urlparse(settings['mongo_uri'])
+    else:
+        db_url = urlparse(os.getenv("WEBCAN_MONGO_URI"))
+        settings['ldap_server'] = os.getenv('LDAP_SERVER')
+        settings['ldap_suffix'] = os.getenv('LDAP_USERNAME_SUFFIX')
+        settings['auth_ticket_key'] = os.getenv('AUTH_TICKET_KEY')
+        settings['smtp_domain'] = os.getenv('SMTP_DOMAIN')
+        settings['smtp_from'] = os.getenv('SMTP_FROM')
+        settings['gmaps_api_key'] = os.getenv('GMAPS_API_KEY')
+
     config = Configurator(settings=settings)
     config.include('pyramid_mako')
+    log.debug('Settings are: \n{}'.format(json.dumps(settings, indent=4)))
     def add_db(request):
         conn = MongoClient(db_url.geturl(),
                            serverSelectionTimeoutMS=10000,
@@ -23,8 +34,9 @@ def main(global_config, **settings):
                            socketTimeoutMS=10000,
                            maxPoolSize=200,
                            maxIdleTimeMs=30000,
-                           appname='webcan')
+                           appname='htm-site')
         db = conn[db_url.path[1:]]
+
         def conn_close(request):
             conn.close()
 
@@ -71,6 +83,7 @@ def main(global_config, **settings):
     config.add_route('login', '/login')
     config.add_route('logout', '/logout')
 
+    config.add_route('favicon', '/favicon.ico')
     config.add_static_view(name='assets', path='assets', cache_max_age=3600)
     config.scan()
     return config.make_wsgi_app()

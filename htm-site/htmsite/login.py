@@ -4,7 +4,9 @@ from pyramid.security import remember, forget
 from datetime import datetime, timedelta
 from pyramid.view import view_config
 import pyramid.httpexceptions as exc
+import logging
 import bcrypt
+log = logging.getLogger(__name__)
 
 
 @subscriber(BeforeTraversal)
@@ -57,6 +59,7 @@ def login(request):
                                                       request.registry.settings['ldap_server'],
                                                       request.registry.settings['ldap_suffix'])
                     if err is not None:
+                        log.debug("Failed login by {}: {}".format(username, err))
                         message = err
                 else:  # if user['login'] == 'external':
                     is_valid = check_pass(password, user['password'])

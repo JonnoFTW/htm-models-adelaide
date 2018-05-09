@@ -16,11 +16,13 @@ requires = [
     'geopy',
     'ldap3',
     'numpy',
-    'bcrypt'
+    'bcrypt',
+    'numba',
+    'matplotlib'
     ]
 
 setup(name='htm-site',
-      version='0.1',
+      version='0.2',
       description='htm-site',
       long_description=README + '\n\n' + CHANGES,
       classifiers=[
