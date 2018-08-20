@@ -439,6 +439,10 @@
         mapCrash.removeMarkers();
         mapCrash.addMarker(mainMarker);
         %for i in intersection['neighbours']:
+            <%
+                if 'loc' not in i:
+                    continue
+            %>
             mapCrash.addMarker({
                 lat: ${i['loc']['coordinates'][1]},
                 lng: ${i['loc']['coordinates'][0]},
