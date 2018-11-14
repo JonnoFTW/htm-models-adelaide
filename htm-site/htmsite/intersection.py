@@ -147,6 +147,33 @@ def get_readings_anomaly_json(request):
         tt = int(tt)
     return get_anomaly_scores(ft, tt, args['intersection'], request=request)
 
+@view_config(route_name='get_anomalies_json', renderer='pymongo_cursor')
+def get_anomalies(request):
+    args = request.matchdict
+    request.response.content_type = 'application/json'
+    ft = request.GET.get('from', None)
+    tt = request.GET.get('to', None)
+
+    if ft is not None:
+        ft = int(ft)
+    if tt is not None:
+        tt = int(tt)
+    if type(ft) is int:
+        from_date = du(ft)
+    if type(tt) is int:
+        to_date = du(tt)
+    if ft > tt:
+        from_date, to_date = to_date, from_date
+    intersection = args['intersection']
+    query = {'site_no': intersection}
+    if ft or tt:
+        query['datetime'] = {}
+    if ft is not None:
+        query['datetime']['$gte'] = from_date
+    if tt is not None:
+        query['datetime']['$lte'] = to_date
+    return request.db.scats_anomalies.find(query)
+
 
 @view_config(route_name='map', renderer='views/map.mako')
 def show_map(request):

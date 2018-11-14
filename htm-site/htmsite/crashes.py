@@ -13,7 +13,7 @@ from pyramid.view import view_config
 def investigate_crash(request):
     intersections = _get_intersections(request, False)
     return {
-        'intersections': json.dumps(list(intersections))
+        'intersections': json.dumps([i for i in intersections if 'loc' in i])
     }
 
 
@@ -55,11 +55,16 @@ def crash_in_polygon(request):
             }
         }).limit(2)
         sites = pluck(list(sites), 'site_no')
-        readings = readings_coll.find({
-            'datetime': {'$gte': crash['datetime'] - td, '$lte': crash['datetime'] + td},
-            'site_no': {'$in': sites}
-        }).limit(6).sort([['site_no', pymongo.ASCENDING], ['datetime', pymongo.ASCENDING]])
-        crashes[i]['readings'] = list(readings)
+        # readings = readings_coll.find({
+        #     'datetime': {'$gte': crash['datetime'] - td, '$lte': crash['datetime'] + td},
+        #     'site_no': {'$in': sites}
+        # }).limit(6).sort([['site_no', pymongo.ASCENDING], ['datetime', pymongo.ASCENDING]])
+        anomalies = request.db.scats_anomalies.find({
+            'site_no': {'$in': sites},
+            'datetime': {'$gte': crash['datetime'] - timedelta(minutes=10),
+                         '$lte': crash['datetime'] + timedelta(minutes=10)}
+        })
+        crashes[i]['anomalies'] = list(anomalies)
         crashes[i]['sites'] = sites
     return {
         'crashes': crashes

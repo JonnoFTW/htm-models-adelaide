@@ -45,7 +45,7 @@ def export_csv_render(request):
 
     zip_out = BytesIO()
     now = datetime.now().timetuple()
-    with zipfile.ZipFile(zip_out, 'w', compression=zipfile.ZIP_LZMA) as zip_file_obj:
+    with zipfile.ZipFile(zip_out, 'w', compression=zipfile.ZIP_BZIP2) as zip_file_obj:
         zip_file_obj.writestr(zipfile.ZipInfo('readings.csv', date_time=now), csv_io.getvalue())
         for site in request.db.locations.find({'site_no': query['site_no']}):
             img64 = site['scats_diagram']

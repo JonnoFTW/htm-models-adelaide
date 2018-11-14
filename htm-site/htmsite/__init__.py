@@ -70,6 +70,7 @@ def main(global_config, **settings):
     config.add_route('intersection_json', '/intersections.json')
     config.add_route('intersection_info', '/intersection_{intersection}.json')
     config.add_route('readings_anomaly_json', '/get_readings_anomaly_{intersection}.json')
+    config.add_route('get_anomalies_json', '/get_anomaly_{intersection}.json')
 
     config.add_route('reports', '/reports/{intersection}/{report}')
 

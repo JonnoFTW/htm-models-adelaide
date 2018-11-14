@@ -1,3 +1,4 @@
 *.pid
 *.log
 /development.ini
+/htm_site.egg-info/

@@ -1,23 +1,23 @@
 <%include file="header.mako"/>
 
 <%
-    from bson import json_util
-    import json
-    from pluck import pluck
-    import time
-    def mkunix(dt):
-  return int(time.mktime(dt.timetuple()))
+from bson import json_util
+import json
+from pluck import pluck
+import time
+def mkunix(dt):
+    return int(time.mktime(dt.timetuple()))
 
-    has_anything = scores_count > 0
-    pfield = str(intersection['sensors'][0])
-    if isinstance(intersection['sensors'], str):
-  popular_sensors = []
-  intersection['sensors'] = []
-    else:
-  popular_sensors = map(int,intersection['sensors'])
-  intersection['sensors'] = sorted(map(int,intersection['sensors']))
+has_anything = scores_count > 0
+pfield = str(intersection['sensors'][0])
+if isinstance(intersection['sensors'], str):
+    popular_sensors = []
+    intersection['sensors'] = []
+else:
+    popular_sensors = map(int,intersection['sensors'])
+    intersection['sensors'] = sorted(map(int,intersection['sensors']))
 
-    del intersection['_id']
+del intersection['_id']
 %>
 <script type="text/javascript" src="//cdn.jsdelivr.net/bootstrap.daterangepicker/2/daterangepicker.js"></script>
 <script type="text/javascript" src="/assets/fontawesome-markers.min.js"></script>
@@ -50,12 +50,14 @@
                                 <td>${k.replace('_',' ').title()}</td>
                                 <td>
                                     % if k == 'neighbours':
-                                        <select class="select2-from form-control" multiple style="width:100%; padding-bottom:10px" id="neighbour-list">
-                                        %for n in v:
-                                            <option selected value="${n['site_no']}">${n['site_no']}</option>
-                                        %endfor
+                                        <select class="select2-from form-control" multiple
+                                                style="width:100%; padding-bottom:10px" id="neighbour-list">
+                                            %for n in v:
+                                                <option selected value="${n['site_no']}">${n['site_no']}</option>
+                                            %endfor
                                         </select>
-                                        <button id="save-neighbours-list" data-id="${intersection['site_no']}" type="button" style="margin-top:10px" class="btn btn-primary">Save
+                                        <button id="save-neighbours-list" data-id="${intersection['site_no']}"
+                                                type="button" style="margin-top:10px" class="btn btn-primary">Save
                                         </button>
                                         <div class="alert alert-success" id="list-alert" style="display:none"
                                              role="alert"> Saved!
@@ -67,7 +69,8 @@
                                             <thead>
                                             <tr>
                                                 <th style="width: 10%">Intersection</th>
-##                                                 <th style="width: 45%">From</th>
+                                                ##                                                 <th style="width: 45%">From</th>
+
                                                 <th style="width: 45%">To</th>
                                             </tr>
                                             </thead>
@@ -75,40 +78,43 @@
                                                 % for nid in pluck(intersection['neighbours'], 'site_no'):
                                                     <tr data-intersection="${nid}">
                                                         <td><a href="/intersection/${nid}">${nid}</a></td>
-##                                                         <td>
-##                                                             <input class="form-control ">${v.get(nid, '')} </input>
-##                                                             <select class="select2-from form-control sensor-map"
-##                                                                     multiple style="width:100%"
-##                                                                     data-intersection-from="${nid}">
-##                                                                 <% neighbour_intersection = {k['site_no']:k for k in intersection['neighbours']}[nid] %>
-##                                                                 % if 'sensors' in neighbour_intersection:
-## ##                                                                     % for sensor in sorted(neighbour_intersection['sensors'], key=lambda x: int(x)):
-##                                                                     ## sensors on the other end
-##                                                                         <%
-##                                                                         checked = ""
-##                                                                         ##                                                               print intersection
-## ##                                                                         if nid in intersection['neighbours_sensors'] and sensor in intersection['neighbours_sensors'][nid]['from']:
-## ##                                                                     checked = "selected"
-##                                                                     %>
-##                                                                         <option ${checked}
-##                                                                                 value="${sensor}">${sensor}</option>
-## ##                                                                     % endfor
-##                                                                 % endif
-##                                                             </select>
+                                                        ##                                                         <td>
+                                                        ##                                                             <input class="form-control ">${v.get(nid, '')} </input>
+                                                        ##                                                             <select class="select2-from form-control sensor-map"
+                                                        ##                                                                     multiple style="width:100%"
+                                                        ##                                                                     data-intersection-from="${nid}">
+                                                        ##                                                                 <% neighbour_intersection = {k['site_no']:k for k in intersection['neighbours']}[nid] %>
+                                                        ##                                                                 % if 'sensors' in neighbour_intersection:
+                                                        ## ##                                                                     % for sensor in sorted(neighbour_intersection['sensors'], key=lambda x: int(x)):
+                                                        ##                                                                     ## sensors on the other end
+                                                        ##                                                                         <%
+                                                        ##                                                                         checked = ""
+                                                        ##                                                                         ##                                                               print intersection
+                                                        ## ##                                                                         if nid in intersection['neighbours_sensors'] and sensor in intersection['neighbours_sensors'][nid]['from']:
+                                                        ## ##                                                                     checked = "selected"
+                                                        ##                                                                     %>
+                                                        ##                                                                         <option ${checked}
+                                                        ##                                                                                 value="${sensor}">${sensor}</option>
+                                                        ## ##                                                                     % endfor
+                                                        ##                                                                 % endif
+                                                        ##                                                             </select>
+
                                                         <td>
                                                             ## sensors on this intersection
-                                                              <select class="select2-to form-control sensor-map" multiple
-                                                          style="width:100%" data-intersection-to="${nid}">
+                                                              <select class="select2-to form-control sensor-map"
+                                                                      multiple
+                                                                      style="width:100%" data-intersection-to="${nid}">
                                                             %if 'neighbours_sensors' in intersection and nid in intersection['neighbours_sensors']:
                                                                 %for sensor in sorted(intersection['sensors'], key=lambda x: int(x)):
                                                                 <% sensor = int(sensor) %>
                                                                 ## sensors on the this end
                                                                  <%
-                                                                 checked = ""
-                                                                 if  nid in intersection['neighbours_sensors'] and sensor in intersection['neighbours_sensors'][nid]['to']:
+                                                                                                                                     checked = ""
+                                                                                                                                     if  nid in intersection['neighbours_sensors'] and sensor in intersection['neighbours_sensors'][nid]['to']:
                                                                     checked = "selected"
                                                                 %>
-                                                                    <option ${checked} value="${sensor}">${sensor}</option>
+                                                                    <option ${checked}
+                                                                            value="${sensor}">${sensor}</option>
                                                                 % endfor
                                                             %endif
                                                         </select>
@@ -132,38 +138,38 @@
                                         %endfor
                                     % elif k == 'strategic_inputs':
                                         <p>Match with strategic_input field in scats_sm data</p>
-                                            % for si_config in v:
-##                                                 <div class="panel list-group">
-##                                                     <div class="list-group-item">
-##
-##
-##                                                     </div>
-##                                                 </div>
+                                    % for si_config in v:
+                                    ##                                                 <div class="panel list-group">
+                                    ##                                                     <div class="list-group-item">
+                                    ##
+                                    ##
+                                    ##                                                     </div>
+                                    ##                                                 </div>
                                                 ${si_config['date']}
-                                                 <table class="table table-condensed">
-                                                    <thead>
+                                        <table class="table table-condensed">
+                                            <thead>
+                                            <tr>
+                                                <th style="width: 10%">SI</th>
+                                                <th style="width: 45%">Sensors</th>
+                                            </tr>
+                                            </thead>
+                                            <tbody id="strategic-inputs">
+                                                % for si_id, si_data in si_config['si'].items():
                                                     <tr>
-                                                        <th style="width: 10%">SI</th>
-                                                        <th style="width: 45%">Sensors</th>
+                                                        <td><a href="#observations" class="si-swapper">${si_id}</a></td>
+                                                        <td>
+                                                            % for d in si_data['sensors']:
+                                                                <a href="#observations" class="sensor-swapper">${d}</a>
+                                                            % endfor
+                                                            %if si_data['site_no'] != intersection['site_no']:
+                                                                (${si_data['site_no']})
+                                                            %endif
+                                                        </td>
                                                     </tr>
-                                                    </thead>
-                                                    <tbody id="strategic-inputs">
-                                                        % for si_id, si_data in si_config['si'].items():
-                                                            <tr>
-                                                                <td>${si_id}</td>
-                                                                <td>
-                                                                    % for d in si_data['sensors']:
-                                                                        <a href="#observations" class="sensor-swapper">${d}</a>
-                                                                    % endfor
-                                                                    %if si_data['site_no'] != intersection['site_no']:
-                                                                            (${si_data['site_no']})
-                                                                    %endif
-                                                                </td>
-                                                            </tr>
-                                                        % endfor
-                                                    </tbody>
-                                                 </table>
-                                         % endfor
+                                                % endfor
+                                            </tbody>
+                                        </table>
+                                    % endfor
                                     % else:
                                         ${v}
                                     % endif
@@ -212,21 +218,23 @@
                 <div class="panel-body">
                     ##                         <div style="height:600px">
                     % if 'scats_diagram' in intersection:
-##                         <div class="tiles">
-##                        <div class="tile" data-scale="2.4" data-image="data:image/png;base64,${intersection['scats_diagram']}"></div></div>
+                ##                         <div class="tiles">
+                ##                        <div class="tile" data-scale="2.4" data-image="data:image/png;base64,${intersection['scats_diagram']}"></div></div>
                         <a href="#" class="pop">
-                            <img class="img-responsive" src="data:image/png;base64,${intersection['scats_diagram']}">
-                        </a>
-                        <div class="modal fade" id="imagemodal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
-                          <div class="modal-dialog modal-huge">
+                    <img class="img-responsive" src="data:image/png;base64,${intersection['scats_diagram']}">
+                </a>
+                    <div class="modal fade" id="imagemodal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel"
+                         aria-hidden="true">
+                        <div class="modal-dialog modal-huge">
                             <div class="modal-content">
-                              <div class="modal-body">
-                                <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
-                                <img src="" class="imagepreview" style="width: 100%;" >
-                              </div>
+                                <div class="modal-body">
+                                    <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span
+                                            class="sr-only">Close</span></button>
+                                    <img src="" class="imagepreview" style="width: 100%;">
+                                </div>
                             </div>
-                          </div>
                         </div>
+                    </div>
 
                 %else:
                     <img class="img-responsive" src="/assets/missing.png">
@@ -240,30 +248,35 @@
 
     </div>
     % if scores_count:
-        <div class="row">
+        <div class="row" id="observations" style="margin-top:60px;padding-top:60px;">
             <div class="col-lg-12">
                 <div class="panel panel-default">
-                    <div class="panel-heading" id="observations">
+                    <div class="panel-heading">
                         <i class="fa fa-line-chart fa-fw"></i>
                         Observation <i class="fa fa-spinner fa-pulse loaderImage"></i>
                         <div class="dropdown pull-right">
-                            <select id="sensors-select" multiple>
+                            <a href="#" class="dropdown-toggle" data-toggle="dropdown"
+                               id="sensor-label">Sensors: </a>
+                            <select id="sensors-select" style="width:300px" multiple>
                                 %for sensor in range(1,25):
-                                    <option value="${sensor}">${sensor}</option>
+                                    <option value="${sensor}"
+                                        % if sensor ==1:
+                                            selected
+                                        % endif
+                                    >${sensor}</option>
                                 %endfor
                             </select>
-                            <a href="#" class="dropdown-toggle" data-toggle="dropdown"
-                               id="sensor-label">Sensor: ${pfield}<b class="caret"></b></a>
-                            <label for="observation-sum">Sum</label><input type="radio" name="observation-sum"/>
-                            <ul class="dropdown-menu" role="menu" aria-labelledby="prediction-sensor-menu">
-                                %for sensor in sorted(popular_sensors, key=lambda x: int(x)):
-                                    <li
-                                        %if int(sensor) == int(pfield):
-                                            class="active"
-                                        %endif
-                                    ><a class="sensor-swapper">${sensor}</a></li>
-                                %endfor
-                            </ul>
+
+                            ##                             <label for="observation-sum">Sum</label><input type="radio" name="observation-sum"/>
+                            ##                             <ul class="dropdown-menu" role="menu" aria-labelledby="prediction-sensor-menu">
+                            ##                                 %for sensor in sorted(popular_sensors, key=lambda x: int(x)):
+                            ##                                     <li
+                            ##                                         %if int(sensor) == int(pfield):
+                            ##                                             class="active"
+                            ##                                         %endif
+                            ##                                     ><a class="sensor-swapper">${sensor}</a></li>
+                            ##                                 %endfor
+                            ##                             </ul>
                         </div>
 
                     </div>
@@ -439,10 +452,10 @@
         mapCrash.removeMarkers();
         mapCrash.addMarker(mainMarker);
         %for i in intersection['neighbours']:
-            <%
-                if 'loc' not in i:
+        <%
+            if 'loc' not in i:
                     continue
-            %>
+        %>
             mapCrash.addMarker({
                 lat: ${i['loc']['coordinates'][1]},
                 lng: ${i['loc']['coordinates'][0]},
@@ -496,8 +509,8 @@
                 'Weather_Cond - Moisture_Cond', 'Crash_Type', 'Involves_4WD', 'Total_Damage'], function (idx2, field) {
 
                 row.append('<td>' + _.map(field.split('-'), function (x) {
-                            if (x == 'datetime')return moment.utc(value[x]['$date']).format('LLLL'); else return value[x.trim()];
-                        }).join(' - ') + '</td>');
+                    if (x == 'datetime') return moment.utc(value[x]['$date']).format('LLLL'); else return value[x.trim()];
+                }).join(' - ') + '</td>');
             });
             $('#incidents-table').append(row);
         });
@@ -513,11 +526,11 @@
             obj.setIcon(markerIcon(index == idx - 1));
         });
     };
-    <%
-    if scores_count == 0:
+        <%
+            if scores_count == 0:
         start_title = incidents[0]['datetime'].strftime('%d/%m/%Y')
         end_title = incidents[-1]['datetime'].strftime('%d/%m/%Y')
-    %>
+        %>
     var neighbour_diagrams = {
         % for s in intersection['neighbours']:
             % if 'scats_diagram' in s:
@@ -530,8 +543,8 @@
 
         % endfor
     }
-    %if has_anything: ## anything related to sensor readings goes here
-        var allData;
+        %if has_anything: ## anything related to sensor readings goes here
+        var allData, anomalyData;
 
         var hideLoader = function () {
             $('.loaderImage').hide();
@@ -550,26 +563,32 @@
                             // no data!
                             console.log('No data');
                         } else {
-                            allData = data;
-                            var txt = moment.utc(data[0]["datetime"]["$date"]).format('LLL') + " - " + moment.utc(data[data.length - 1]["datetime"]["$date"]).format('LLL');
+                            $.getJSON('/get_anomaly_${intersection['site_no']}.json', args, function (dataAnom) {
+                                anomalyData = dataAnom;
+                                allData = data;
+                                var txt = moment.utc(data[0]["datetime"]["$date"]).format('LLL') + " - " + moment.utc(data[data.length - 1]["datetime"]["$date"]).format('LLL');
 
-                            $('#date-range-text').text(txt);
-                            if (callback)
-                                callback();
-                            anomalyChart.updateOptions({
-                                dateWindow: null,
-                                valueRange: null
+                                $('#date-range-text').text(txt);
+                                if (callback)
+                                    callback();
+                                anomalyChart.updateOptions({
+                                    dateWindow: null,
+                                    valueRange: null
+                                });
+                                predictionChart.updateOptions({
+                                    dateWindow: null,
+                                    valueRange: null
+                                });
                             });
-                            predictionChart.updateOptions({
-                                dateWindow: null,
-                                valueRange: null
-                            });
+
                         }
                         hideLoader();
                     }).fail(function () {
                 hideLoader();
             });
+
         };
+
         function Queue(size) {
             this.queue = [];
             this.size = size;
@@ -585,8 +604,8 @@
         }
         Queue.prototype.avg = function () {
             return _.reduce(this.queue, function (x, y) {
-                        return x + y
-                    }, 0) / this.queue.length;
+                return x + y
+            }, 0) / this.queue.length;
         }
         var makeAnomalyReadingArrays = function (sensor, only) {
             var threshold = parseFloat($('#threshold-input').val());
@@ -596,14 +615,15 @@
             //return an array made from all data
             var aData = new Array(allData.length);
             var pData = new Array(allData.length);
+            var multiSensors = $('#sensors-select').select2('val');
             var out;
             var queue = null;
             if (meanFilter > 1) {
                 queue = new Queue(meanFilter);
             }
-            if (only == 'anomaly')
+            if (only === 'anomaly')
                 out = {'aData': aData};
-            else if (only == 'readings')
+            else if (only === 'readings')
                 out = {'pData': pData};
             else
                 out = {'aData': aData, 'pData': pData};
@@ -612,9 +632,17 @@
 
                 var row_time = row["datetime"]["$date"];
 
-                if (only != 'anomaly') {
-
-                    var value = row['readings'][sensor] < ${max_vehicles}? row['readings'][sensor] : null;
+                if (only !== 'anomaly') {
+                    var value;
+                    if (multiSensors) {
+                        value = 0;
+                        multiSensors.forEach(function (el) {
+                            var v = row['readings'][el];
+                            if (v < ${max_vehicles})
+                                value += v;
+                        });
+                    } else
+                        value = row['readings'][sensor] < ${max_vehicles}? row['readings'][sensor] : null;
                     var mean_value = null;
                     if (queue) {
                         queue.push(value);
@@ -622,25 +650,40 @@
                     }
                     pData[index] = [new Date(row_time), value, mean_value];
                 }
-                if (row['anomalies'] !== undefined && only != 'readings') {
+                if (row['anomalies'] !== undefined && only !== 'readings') {
                     anomalyCount = _.filter(row['anomalies'], function (n) {
                         return n['likelihood'] > threshold;
                     }).length;
                     aData[index] = [new Date(row_time),
                         row['anomalies'][sensor]['score'],
                         !logarithm ? row['anomalies'][sensor]['likelihood'] :
-                        Math.log(1.0 - row['anomalies'][sensor]['likelihood']) / -23.02585084720009,
+                                Math.log(1.0 - row['anomalies'][sensor]['likelihood']) / -23.02585084720009,
                         _.find(incidents, function (n) {
-                            return Math.round(n['datetime']['$date'] / 300000) * 300000 == row_time;
+                            return Math.round(n['datetime']['$date'] / 300000) * 300000 === row_time;
                         }) ? 1.1 : null,
                         anomalyCount >= 1 ? anomalyCount / Object.keys(row['anomalies']).length : null
                     ];
                 } else {
-                    aData[index] = [new Date(row_time), null, null
-                        , _.find(incidents, function (n) {
-                            return n['datetime']['$date'] == row_time;
-                        }) ? 1.1 : null,
-                        null];
+                    var nowAnoms = _.filter(anomalyData, function (n) {
+                        return n['datetime']['$date'] === row_time;
+                    });
+                    var htmAnom = null, shesdAnom = null;
+                    _.forEach(nowAnoms, function(x) {
+                        if(x['algorithm'] == 'HTM') {
+                            htmAnom = x.other.likelihood;
+
+                        } else if(x.algorithm == 'shesd') {
+                            shesdAnom = 1.1
+                        }
+                    });
+
+                    aData[index] = [new Date(row_time),
+                        htmAnom,
+                        shesdAnom,
+                        _.find(incidents, function (n) {
+                            return n['datetime']['$date'] === row_time;
+                        }) ? 1.2 : null
+                        ];
                 }
             });
             return out
@@ -658,22 +701,17 @@
             </div>').height('0');
                 } else {
                     anomalyChart = new Dygraph(document.getElementById('anomaly-chart'), arReadings.aData, {
-                        title: 'Anomaly value for intersection ${intersection['site_no']}',
+                        title: 'Incidents and Anomalies for intersection ${intersection['site_no']}',
                         ylabel: 'Anomaly',
                         xlabel: 'Date',
-                        anomaly: {
+                        HTM_Anomaly: {
                             color: "blue",
                         },
-                        likelihood: {
+                        SHESD_Anomaly: {
                             color: "red",
                         },
-                        incident: {
+                        Incident: {
                             color: "green",
-                            strokeWidth: 0.0,
-                            pointSize: 4,
-                        },
-                        incident_predict: {
-                            color: "orange",
                             strokeWidth: 0.0,
                             pointSize: 4,
                         },
@@ -687,17 +725,17 @@
                         },
                         highlightCallback: function (event, x, points, row, seriesName) {
                             highlightX(predictionChart, row);
-                            if (points[2].xval) {
+                            if (points[1].xval) {
                                 // find idx of point[2] in incidents array
                                 // using xval
                                 var accidentIdx = 1 + _.findIndex(incidents, function (x) {
-                                            return Math.round(x["datetime"]["$date"] / 300000) * 300000 == points[2].xval;
-                                        });
+                                    return Math.round(x["datetime"]["$date"] / 300000) * 300000 == points[2].xval;
+                                });
                                 //console.log("Moused over", accidentIdx);
                                 highlightAccident(accidentIdx);
                             }
-                            if (points[3].yval) {
-                                $('#anomaly-list-label').text("High Anomaly at " + moment.utc(points[3].xval).format('LLLL'));
+                            if (points[2].yval) {
+                                $('#anomaly-list-label').text("High Anomaly at " + moment.utc(points[3].xval).local().format('LLLL'));
                                 var threshold = parseFloat($('#threshold-input').val());
                                 var sensors = [];
                                 _.each(allData[row]['anomalies'], function (val, key) {
@@ -711,7 +749,7 @@
                                 });
                             }
                         },
-                        labels: ['UTC', 'anomaly', 'likelihood', 'incident', 'incident_predict'],
+                        labels: ['UTC', 'HTM_Anomaly', 'SHESD_Anomaly', 'Incident'],
                         <%include file="dygraph_weekend.js"/>
                     });
                 }
@@ -794,16 +832,26 @@
                     moment.utc(dates[1].trim(), daterangepickerformat).unix(),
                     setChartsFromMake);
         });
-
+        $('#sensors-select').on("change", function (e) {
+            setChartsFromMake();
+        });
         var setChartsFromMake = function () {
             var arReadings = makeAnomalyReadingArrays(pfield);
-            predictionChart.updateOptions({'file': arReadings.pData, 'title': 'Observation on Sensor: ' + pfield});
+            var title = pfield;
+            var multi = $('#sensors-select').select2("val");
+            if (multi) {
+                title = multi.join(",");
+            }
+            predictionChart.updateOptions({'file': arReadings.pData, 'title': 'Observation on Sensor: ' + title});
             anomalyChart.updateOptions({'file': arReadings.aData, axes: {y: {valueRange: [0, 1.3]}}});
+            updateIncidents();
 
         };
         $(document).ready(function () {
-            if (${scores_count}>0)
-                setupDygraphs();
+            if (${scores_count}>
+            0
+        )
+            setupDygraphs();
             $('.shift-data').click(function (e) {
                 // determine if we are older or newer
                 var older = $(this).text() === 'Older';
@@ -850,22 +898,34 @@
 
         %endif
     setupIncidents(radius);
+
     function toggleChevron(e) {
         $(e.target)
                 .parent()
                 .find('span.glyphicon')
                 .toggleClass('glyphicon-chevron-down glyphicon-chevron-up');
     }
+
     $('#accordion').on('hidden.bs.collapse', toggleChevron);
     $('#accordion').on('shown.bs.collapse', toggleChevron);
 
     $('body').on('click', '.sensor-swapper', function () {
-        pfield = $(this).text();
-        console.log('sensor swapping to', pfield);
+        var sensorId = $(this).text();
+        var oldValues = $("#sensors-select").val();
+        oldValues.push(sensorId);
+        var uniqueArray = oldValues.filter(function (item, pos) {
+            return oldValues.indexOf(item) == pos;
+        });
+        $('#sensors-select').select2().val(uniqueArray).trigger('change');
+        console.log('adding sensor to', sensorId);
         setChartsFromMake();
 
-        $('#sensor-label').html('Sensor: ' + pfield + ' <b class="caret"></b>');
+        ##  $('#sensor-label').html('Sensor: ' + pfield + ' <b class="caret"></b>');
         $('.sensor-swapper:contains("' + pfield + '")').parent().addClass('active').siblings().removeClass('active');
+    });
+    $('body').on('click', '.si-swapper', function () {
+        $('#sensors-select').select2().val($(this).parent().next().text().replace(/\s+/g, ' ').trim().split(" ")).trigger('change');
+        setChartsFromMake();
     });
     $('.radius-swapper').click(function () {
         radius = $(this).text();
@@ -891,7 +951,9 @@
         ;
     });
     var updateIncidents = function (radius, start, end) {
-
+        if (!radius) {
+            radius = $('#radius-label').text().split(' ')[1].slice(0, -1);
+        }
         if (!start) {
             start = $('input[name="daterange"]').data('daterangepicker').startDate.unix();
             end = $('input[name="daterange"]').data('daterangepicker').endDate.unix();
@@ -905,7 +967,7 @@
             setupIncidents(radius);
         });
     };
-   $('#save-neighbours').click(function (e) {
+    $('#save-neighbours').click(function (e) {
         // ajax save the new neighbour organisation
 
         var data = {}
@@ -928,16 +990,16 @@
         })
     });
 
-   $('.pop').on('click', function() {
-			$('.imagepreview').attr('src', $(this).find('img').attr('src'));
-			$('#imagemodal').modal('show').on('click', function() {
-                $('#imagemodal').modal('hide');
-            });
+    $('.pop').on('click', function () {
+        $('.imagepreview').attr('src', $(this).find('img').attr('src'));
+        $('#imagemodal').modal('show').on('click', function () {
+            $('#imagemodal').modal('hide');
+        });
 
-		});
+    });
 
 
-<%include file="neighbour_save.mako" />
+        <%include file="neighbour_save.mako" />
 
 </script>
 
