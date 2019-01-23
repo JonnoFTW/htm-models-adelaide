@@ -1,18 +1,21 @@
 #!/usr/bin/env python
 from __future__ import print_function
 
+from io import BytesIO
+from time import time
+
 from hyperopt import Trials, STATUS_OK, tpe, mongoexp
 from nupic.frameworks.opf.model_factory import ModelFactory
 from hyperas import optim
 from hyperas.distributions import choice, uniform, quniform
-from pluck import pluck
 from tqdm import tqdm
 from datetime import datetime, timedelta
 import pickle
-from bson import json_util
-import gzip
+from bson import json_util, Binary
 import numpy as np
-# import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 import logging
 
 logging.basicConfig()
@@ -20,30 +23,21 @@ import os
 
 
 def data():
+    pkl_name = '115_2_sm_dicts.py2.pkl'
+    tmp_name = '/tmp/' + pkl_name
+    if not os.path.exists(tmp_name):
+        print('Downloading file!')
+        import urllib
+        urllib.urlretrieve('http://10.27.41.41:8001/' + pkl_name, tmp_name)
+    print("Loading", tmp_name)
+    with open(tmp_name, 'rb') as tmp_file:
+        rows = pickle.load(tmp_file)
 
-    cdir = os.path.dirname(os.path.realpath(__file__))
-    pkl_fname = (cdir + '/swarm_data/115_2_sm.pkl.gz')
-    tmp_pkl = '/tmp/' + pkl_fname[:-3].split('/')[-1]
-    if os.path.exists(tmp_pkl):
-        with open(tmp_pkl, 'rb') as pkl_file:
-            print("Loading cached {}...".format(pkl_fname), end='')
-            rows = pickle.load(pkl_file)
-
-            print(" done")
-    else:
-        print("Loading {}...".format(pkl_fname), end='')
-        with gzip.open(pkl_fname, 'r') as pkl_file:
-            rows = pickle.load(pkl_file)
-        print(" done")
-        with open(tmp_pkl, 'wb') as tmpout:
-            print("Caching in {}...".format(tmp_pkl), end='')
-            pickle.dump(rows, tmpout)
-            print(" done")
     steps = 1
-    # rows = rows[:20000]
-    rows.sort(key=lambda x:x['sequence'])
-    from pluck import ipluck
-    _max_flow = float(max(ipluck(rows, 'flow')))
+    limit = None
+    rows = rows[:limit]
+    _max_flow = max(rows, key=lambda x: x['measured_flow'])['measured_flow']
+    # rows.sort(key=lambda x: x['sequence'])
     print("MAX FLOW:", _max_flow)
     return rows, _max_flow
 
@@ -128,15 +122,15 @@ def create_model(rows, _max_flow):
                         'type': 'DateEncoder',
                         'dayOfWeek': (dayOfWeek_width, dayOfWeek_radius)
                     },
-                    "flow": {
-                        'fieldname': "flow",
-                        'name': 'flow',
+                    "measured_flow": {
+                        'fieldname': "measured_flow",
+                        'name': 'measured_flow',
                         'type': 'RandomDistributedScalarEncoder',
                         'resolution': max(0.001, (max_flow - 1) / flow_buckets)
                     },
-                    'cycle_time': {
-                        'fieldname': "cycle_time",
-                        'name': 'cycle_time',
+                    'phase_time': {
+                        'fieldname': "phase_time",
+                        'name': 'phase_time',
                         'type': 'RandomDistributedScalarEncoder',
                         'resolution': max(0.001, (max_cycle_time - 1) / cycle_time_buckets)
                     }
@@ -199,13 +193,13 @@ def create_model(rows, _max_flow):
     #    print(json.dumps(params, indent=4))
     start = datetime.now()
     model = ModelFactory.create(params)
-    model.enableInference({'predictedField': 'flow'})
+    model.enableInference({'predictedField': 'measured_flow'})
     model.enableLearning()
 
     actualDict = {}
     predictionsDict = {}
     for row in tqdm(rows, desc='HTM '):
-        actualDict[row['datetime']] = row['flow']
+        actualDict[row['datetime']] = row['measured_flow']
         future_time = row['datetime'] + timedelta(minutes=5)
         predictionsDict[future_time] = model.run(row).inferences['multiStepBestPredictions'][1]
 
@@ -239,20 +233,28 @@ def create_model(rows, _max_flow):
     #     run_pred = np.array(pred_y[max(0, idx-lb):idx+1])
     #     error_scores.append(rmse(run_actual, run_pred))
     #     error_scores_x.append(actual_x[idx])
-
+    rmse_result = rmse(npactual_y, nppred_y)
     metric_results = {
-        'rmse': rmse(npactual_y, nppred_y),
-        # 'mgeh': geh(npactual_y, nppred_y),
+        'rmse': rmse_result,
+        'mgeh': geh(npactual_y, nppred_y),
         'duration': (datetime.now() - start).total_seconds()
     }
-    # plt.plot(actual_x, actual_y, color='b', label='Actual')
-    # plt.plot(pred_x, pred_y, color='r', label='Predictions')
-    # plt.plot(error_scores_x, error_scores, color='g', label='Error')
-    # plt.legend()
-    # plt.title("HTM Predictions at 115, SI 2: {}".format(metric_results['rmse']))
-    # plt.xlabel('Time')
-    # plt.ylabel('Flow')
-    # plt.show()
+    dpi = 80
+    width = 1920 / dpi
+    height = 1080 / dpi
+    plt.figure(figsize=(width, height), dpi=dpi)
+    plt.plot(actual_x, actual_y, color='b', label='Actual')
+    plt.plot(pred_x, pred_y, color='r', label='Predictions')
+    plt.plot(error_scores_x, error_scores, color='g', label='Error')
+    plt.legend()
+    plt.title("HTM Predictions at 115, SI 2: {}".format(metric_results['rmse']))
+    plt.xlabel('Time')
+    plt.ylabel('Flow')
+    fig_name = 'model_{}_{}.png'.format(time(), rmse_result)
+    plt.savefig(fig_name)
+    print("Save image to", fig_name)
+    bytes_out = BytesIO()
+    plt.savefig(bytes_out, format='png')
 
     print("RMSE: {} in {}s".format(*metric_results.values()))
 
@@ -261,28 +263,23 @@ def create_model(rows, _max_flow):
         'status': STATUS_OK,
         'model': params,
         'metrics': metric_results,
+        'figure': Binary(bytes_out.getvalue())
     }
 
 
 if __name__ == '__main__':
-    # trials = Trials()
     import sys
-    trials = mongoexp.MongoTrials(sys.argv[1], exp_key='htm_sm_115')
-    import json
 
-    # try:
+    print(sys.argv)
+    trials = mongoexp.MongoTrials(sys.argv[1], exp_key='htm_sm_115_proper')
+
     best_run, best_model = optim.minimize(model=create_model,
                                           data=data,
                                           algo=tpe.suggest,
-                                          max_evals=300,
+                                          max_evals=200,
+                                          keep_temp=True,
                                           trials=trials)
     print("Best performing model chosen hyper-parameters:")
 
     print(best_run)
     print(json_util.dumps(best_model, indent=4))
-    # except Exception as e:
-    #     print("Error", e.message)
-    #     print(json_util.dumps(list(trials), indent=4))
-
-    # for i in trials:
-    #     print(json.dumps(i, indent=4))

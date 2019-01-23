@@ -14,8 +14,6 @@ from keras import Sequential
 from keras.layers import LSTM, LeakyReLU, Dense, Activation, Dropout, Embedding
 from keras.regularizers import L1L2
 import json
-import base64
-# from hyperas import optim
 from hyperas.distributions import choice, uniform, quniform
 from sklearn.preprocessing import MinMaxScaler
 import pickle
@@ -32,33 +30,26 @@ logging.basicConfig(level=logging.DEBUG)
 
 np.seterr(over='raise')
 
-import subprocess
 import matplotlib
-import gzip
-# matplotlib.use('Agg')
+
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 
 def data():
-    pkl_name = '115_2_sm.pkl'
+    pkl_name = '115_2_sm_dicts.pkl'
     tmp_name = '/tmp/' + pkl_name
-    if os.path.exists(tmp_name):
-        print("Loading", tmp_name)
-        with open(tmp_name, 'rb') as tmp_file:
-            rows = pickle.load(tmp_file)
-    else:
-        cdir = os.path.dirname(os.path.realpath(__file__))
-        pkl_fname = (cdir + '/swarm_data/{}.gz'.format(pkl_name))
-        print("Loading", pkl_fname)
-        p = subprocess.Popen(['zcat', pkl_fname], stdout=subprocess.PIPE)
-        rows = [{k.decode('ascii'): v for k, v in row.items()} for row in pickle.load(p.stdout, encoding='bytes')]
-        rows.sort(key=lambda x: x['sequence'])
-        with open(tmp_name, 'wb') as tmp_file:
-            print("Caching unzipped in", tmp_name)
-            pickle.dump(rows, tmp_file)
+    if not os.path.exists(tmp_name):
+        print('Downloading file!')
+        import urllib.request
+        urllib.request.urlretrieve('http://10.27.41.41:8001/' + pkl_name, tmp_name)
+    print("Loading", tmp_name)
+    with open(tmp_name, 'rb') as tmp_file:
+        rows = pickle.load(tmp_file)
+
     limit = None
     data = rows[:limit]
-
+    data.sort(key=lambda x: x['sequence'])
     return data
 
 
@@ -69,6 +60,7 @@ def create_model(rows):
     use_weekend = {{choice([True, False])}}
     use_holidays = {{choice([True, False])}}
     use_week_number = {{choice([True, False])}}
+    use_phase_time = {{choice([True, False])}}
 
     parsed_rows = []
     holidays = {date(2015, 1, 1),
@@ -112,7 +104,7 @@ def create_model(rows):
                 date(2017, 12, 26),
                 date(2017, 12, 31)}
     for row in rows:
-        flow = row['flow']
+        flow = row['measured_flow']
         dt = row['datetime']
         if flow > 2046:
             continue
@@ -129,6 +121,8 @@ def create_model(rows):
             vals.append(int(dt.isoweekday() in [6, 7]))
         if use_holidays:
             vals.append(int(dt.date() in holidays))
+        if use_phase_time:
+            vals.append(int(row['phase_time']))
         parsed_rows.append(vals)
 
     def rmse(y_true, y_pred, axis=0):
@@ -257,7 +251,8 @@ def create_model(rows):
         'use_month': use_month,
         'use_weekend': use_weekend,
         'use_holidays': use_holidays,
-        'use_week_number': use_week_number
+        'use_week_number': use_week_number,
+        'use_phase_time': use_phase_time
 
     }
     print("PARAMS=", json.dumps(params, indent=4))
@@ -368,7 +363,6 @@ def create_model(rows):
     print("Save image to", fig_name)
     bytes_out = BytesIO()
     plt.savefig(bytes_out, format='png')
-    plt.show()
 
     res = {
         'loss': rmse_result,
@@ -387,7 +381,8 @@ def create_model(rows):
 if __name__ == '__main__':
     import sys
 
-    trials = mongoexp.MongoTrials(sys.argv[1], exp_key='lstm_sm_115_final')
+    trials = mongoexp.MongoTrials(sys.argv[1], exp_key='lstm_sm_115_proper')
+    # trials = Trials()
     # just run LSTM with the same params that worked for sm
     # result = create_model(data())
     # print(json.dumps(result, indent=4))
