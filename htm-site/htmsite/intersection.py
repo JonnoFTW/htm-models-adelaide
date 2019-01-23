@@ -1,5 +1,5 @@
 import json
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 import pymongo
 from .util import du, get_accident_near, date_format
@@ -94,10 +94,19 @@ def show_intersection(request):
     #     anomaly_score_count = 0
     # else:
     #     last = cursor[-1]['datetime']
+    if request.GET.get('start') and request.GET.get('end'):
+        try:
+            from_date = datetime.utcfromtimestamp(int(request.GET['start']) )
+            end_date = datetime.utcfromtimestamp(int(request.GET['end']) )
+            last_reading = next(request.db.scats_readings.find({'site_no': site, 'datetime': {'$gte': end_date}}))
+            print(from_date, end_date)
+        except Exception as e:
+            raise exc.HTTPBadRequest("Invalid start and end times, should be unix stamps " + str(e))
+    else:
 
-    last_reading = list(request.db.scats_readings.find({'site_no': site}).sort([('datetime', -1)]).limit(1))[0]
-    end_date = last_reading['datetime']
-    from_date = end_date - timedelta(days=day_range)
+        last_reading = list(request.db.scats_readings.find({'site_no': site}).sort([('datetime', -1)]).limit(1))[0]
+        end_date = last_reading['datetime']
+        from_date = end_date - timedelta(days=day_range)
     cursor = get_anomaly_scores(from_date=from_date, to_date=end_date, intersection=site, request=request)
     anomaly_score_count = cursor.count()
 
@@ -146,6 +155,7 @@ def get_readings_anomaly_json(request):
     if tt is not None:
         tt = int(tt)
     return get_anomaly_scores(ft, tt, args['intersection'], request=request)
+
 
 @view_config(route_name='get_anomalies_json', renderer='pymongo_cursor')
 def get_anomalies(request):

@@ -1,5 +1,4 @@
 <%include file="header.mako"/>
-
 <%
 from bson import json_util
 import json
@@ -108,12 +107,7 @@ del intersection['_id']
                                                                 %for sensor in sorted(intersection['sensors'], key=lambda x: int(x)):
                                                                 <% sensor = int(sensor) %>
                                                                 ## sensors on the this end
-                                                                 <%
-                                                                                                                                     checked = ""
-                                                                                                                                     if  nid in intersection['neighbours_sensors'] and sensor in intersection['neighbours_sensors'][nid]['to']:
-                                                                    checked = "selected"
-                                                                %>
-                                                                    <option ${checked}
+                                                                    <option ${"selected" if   nid in intersection['neighbours_sensors'] and sensor in intersection['neighbours_sensors'][nid]['to'] else ""}
                                                                             value="${sensor}">${sensor}</option>
                                                                 % endfor
                                                             %endif
@@ -145,7 +139,8 @@ del intersection['_id']
                                     ##
                                     ##                                                     </div>
                                     ##                                                 </div>
-                                                ${si_config['date']}
+                                                ${si_config['date']}</br>
+                                                <small>${si_config.get('comment','')}</small>
                                         <table class="table table-condensed">
                                             <thead>
                                             <tr>
@@ -353,6 +348,7 @@ del intersection['_id']
                         <th>Weather</th>
                         <th>Crash Type</th>
                         <th>Involves 4WD</th>
+                        <th>Severity</th>
                         <th>Total Damage</th>
                     </tr>
                     </thead>
@@ -506,7 +502,7 @@ del intersection['_id']
         $.each(incidents, function (idx1, value) {
             var row = $('<tr></tr>');
             $.each(['datetime', 'App_Error', 'Total_Vehicles_Involved',
-                'Weather_Cond - Moisture_Cond', 'Crash_Type', 'Involves_4WD', 'Total_Damage'], function (idx2, field) {
+                'Weather_Cond - Moisture_Cond', 'Crash_Type', 'Involves_4WD', 'CSEF_Severity','Total_Damage'], function (idx2, field) {
 
                 row.append('<td>' + _.map(field.split('-'), function (x) {
                     if (x == 'datetime') return moment.utc(value[x]['$date']).format('LLLL'); else return value[x.trim()];
@@ -526,11 +522,12 @@ del intersection['_id']
             obj.setIcon(markerIcon(index == idx - 1));
         });
     };
-        <%
-            if scores_count == 0:
+<%
+    if scores_count == 0:
         start_title = incidents[0]['datetime'].strftime('%d/%m/%Y')
         end_title = incidents[-1]['datetime'].strftime('%d/%m/%Y')
-        %>
+%>
+    var annotations = [];
     var neighbour_diagrams = {
         % for s in intersection['neighbours']:
             % if 'scats_diagram' in s:
@@ -627,6 +624,7 @@ del intersection['_id']
                 out = {'pData': pData};
             else
                 out = {'aData': aData, 'pData': pData};
+            annotations = [];
             allData.forEach(function (row, index, in_array) {
                 // columns are: date,anomaly, likelihood, incident, incident_predict],
 
@@ -667,23 +665,67 @@ del intersection['_id']
                     var nowAnoms = _.filter(anomalyData, function (n) {
                         return n['datetime']['$date'] === row_time;
                     });
-                    var htmAnom = null, shesdAnom = null;
-                    _.forEach(nowAnoms, function(x) {
-                        if(x['algorithm'] == 'HTM') {
-                            htmAnom = x.other.likelihood;
+                    var htmAnomVS = null;
+                    var htmAnomSM = null;
+                    var shesdAnomVS = null;
+                    var shesdAnomSM = null;
+                    var shesdtsAnomVS = null;
+                    var shesdtsAnomSM = null;
 
-                        } else if(x.algorithm == 'shesd') {
-                            shesdAnom = 1.1
+                    _.forEach(nowAnoms, function (x) {
+                        if (x.algorithm === 'HTM') {
+
+                            if (x.ds === 'sm') {
+                                htmAnomSM = 1.1
+                            } else {
+                                htmAnomVS = 1.0
+                            }
+                            annotations.push({
+                                series: 'HTM_Anomaly',
+                                x: new Date(row_time),
+                                shortText: x.strategic_input,
+                                text: 'HTM Anomaly {}'.format(x.strategic_input)
+                            });
+
+                        } else if (x.algorithm === 'shesd') {
+                            if (x.ds ==='sm') {
+                                shesdAnomSM = 0.9
+                            } else {
+                                shesdAnomVS = 0.8
+                            }
+                            annotations.push({
+                                series: 'SHESD_Anomaly',
+                                x: new Date(row_time),
+                                shortText: x.strategic_input,
+                                text: 'SHESD Anomaly {}'.format(x.strategic_input)
+                            });
+                        } else if (x.algorithm === 'shesd-ts') {
+                            if (x.ds ==='sm') {
+                                shesdtsAnomSM = 0.7
+                            } else {
+                                shesdtsAnomVS = 0.6
+                            }
+                            annotations.push({
+                                series: 'SHESD-ts_Anomaly',
+                                x: new Date(row_time),
+                                shortText: x.strategic_input,
+                                text: 'SHESD-ts Anomaly {}'.format(x.strategic_input)
+                            });
                         }
+
                     });
 
                     aData[index] = [new Date(row_time),
-                        htmAnom,
-                        shesdAnom,
+                        htmAnomVS ,
+                        htmAnomSM ,
+                        shesdAnomVS ,
+                        shesdAnomSM ,
+                        shesdtsAnomVS,
+                        shesdtsAnomSM,
                         _.find(incidents, function (n) {
                             return n['datetime']['$date'] === row_time;
                         }) ? 1.2 : null
-                        ];
+                    ];
                 }
             });
             return out
@@ -704,16 +746,16 @@ del intersection['_id']
                         title: 'Incidents and Anomalies for intersection ${intersection['site_no']}',
                         ylabel: 'Anomaly',
                         xlabel: 'Date',
-                        HTM_Anomaly: {
-                            color: "blue",
+                        HTM_Anomaly_VS: {
+                            color: "blue"
                         },
-                        SHESD_Anomaly: {
-                            color: "red",
+                        SHESD_Anomaly_VS: {
+                            color: "red"
                         },
                         Incident: {
                             color: "green",
                             strokeWidth: 0.0,
-                            pointSize: 4,
+                            pointSize: 4
                         },
                         axes: {
                             y: {
@@ -725,31 +767,42 @@ del intersection['_id']
                         },
                         highlightCallback: function (event, x, points, row, seriesName) {
                             highlightX(predictionChart, row);
-                            if (points[1].xval) {
+                            if (points[2].xval) {
                                 // find idx of point[2] in incidents array
                                 // using xval
                                 var accidentIdx = 1 + _.findIndex(incidents, function (x) {
-                                    return Math.round(x["datetime"]["$date"] / 300000) * 300000 == points[2].xval;
+                                    return Math.round(x["datetime"]["$date"] / 300000) * 300000 === points[2].xval;
                                 });
                                 //console.log("Moused over", accidentIdx);
                                 highlightAccident(accidentIdx);
                             }
-                            if (points[2].yval) {
-                                $('#anomaly-list-label').text("High Anomaly at " + moment.utc(points[3].xval).local().format('LLLL'));
-                                var threshold = parseFloat($('#threshold-input').val());
-                                var sensors = [];
-                                _.each(allData[row]['anomalies'], function (val, key) {
-                                    if (val.likelihood > threshold)
-                                        sensors.push(key);
-                                });
-                                var anomaly_list = $('p#form-anomalies');
-                                anomaly_list.empty();
-                                $.each(sensors, function (i, val) {
-                                    anomaly_list.append('<a href="#observations" class="sensor-swapper">' + val + '</a> ');
-                                });
-                            }
+                            [0,1].forEach(function(p) {
+                                if (points[p].yval) {
+                                    $('#anomaly-list-label').text("High Anomaly at " + moment.utc(points[p].xval).format('LLLL'));
+                                    var threshold = parseFloat($('#threshold-input').val());
+                                    var sensors = [];
+                                    _.each(anomalyData, function (val) {
+                                        if (val.datetime.$date === points[p].xval)
+                                            sensors.push([val.algorithm, val.strategic_input]);
+                                    });
+                                    var anomaly_list = $('p#form-anomalies');
+                                    anomaly_list.empty();
+                                    $.each(sensors, function (i, val) {
+                                        anomaly_list.append(val[0]+'<a href="#observations" class="si-swapper">' + val[1] + '</a> <br/>');
+                                    });
+                                }
+                            })
+
                         },
-                        labels: ['UTC', 'HTM_Anomaly', 'SHESD_Anomaly', 'Incident'],
+                        labels: ['UTC',
+                            'HTM_Anomaly_VS',
+                            'HTM_Anomaly_SM',
+                            'SHESD_Anomaly_VS',
+                            'SHESD_Anomaly_SM',
+                            'SHESD-ts_Anomaly_VS',
+                            'SHESD-ts_Anomaly_SM',
+                            'Incident'
+                        ],
                         <%include file="dygraph_weekend.js"/>
                     });
                 }
@@ -811,8 +864,8 @@ del intersection['_id']
             }
         };
         <%
-            start_title = time_start.strftime('%d/%m/%Y')
-            end_title = time_end.strftime('%d/%m/%Y')
+            start_title = time_start.strftime('%d/%m/%Y %H:%M')
+            end_title = time_end.strftime('%d/%m/%Y %H:%M')
         %>
 
 
@@ -844,6 +897,7 @@ del intersection['_id']
             }
             predictionChart.updateOptions({'file': arReadings.pData, 'title': 'Observation on Sensor: ' + title});
             anomalyChart.updateOptions({'file': arReadings.aData, axes: {y: {valueRange: [0, 1.3]}}});
+            anomalyChart.setAnnotations(annotations);
             updateIncidents();
 
         };

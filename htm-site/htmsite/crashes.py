@@ -1,5 +1,5 @@
 import json
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 import pymongo
 from geopy.distance import vincenty
@@ -31,19 +31,36 @@ def crash_in_polygon(request):
     readings_coll = request.db.scats_readings
     crashes_coll = request.db.crashes
     locations_coll = request.db.locations
-    points = request.json_body
-    # make sure it's a list of lists of floats
-    points.append(points[0])
-    crashes = crashes_coll.find({'loc': {
-        '$geoWithin': {
-            '$geometry': {
-                'type': 'Polygon',
-                'coordinates': [points]
-            }
-        }
-    }})
+    start = datetime(2012, 1, 1, 0, 0, 0)
+    end = datetime(2015, 12, 12, 23, 59)
+    drange = {'$gte': start, '$lte': end}
+
+    if request.GET.get('site'):
+        crashes = crashes_coll.find({
+            'datetime': drange,
+            'loc': {
+                '$geoNear': {
+                    '$geometry': locations_coll.find_one({'site_no': request.GET['site']})['loc'],
+                    '$maxDistance': 100
+                }
+            }}).sort([('datetime', 1)])
+    else:
+        points = request.json_body
+        # make sure it's a list of lists of floats
+        points.append(points[0])
+
+        crashes = crashes_coll.find({
+            'datetime': drange,
+            'loc': {
+                '$geoWithin': {
+                    '$geometry': {
+                        'type': 'Polygon',
+                        'coordinates': [points]
+                    }
+                }
+            }}).sort([('datetime', 1)])
     crashes = list(crashes)
-    td = timedelta(minutes=5)
+    td = timedelta(minutes=10)
     for i, crash in enumerate(crashes):
         # find the nearest 2 intersections
         # and get the readings for the downstream one
@@ -61,8 +78,8 @@ def crash_in_polygon(request):
         # }).limit(6).sort([['site_no', pymongo.ASCENDING], ['datetime', pymongo.ASCENDING]])
         anomalies = request.db.scats_anomalies.find({
             'site_no': {'$in': sites},
-            'datetime': {'$gte': crash['datetime'] - timedelta(minutes=10),
-                         '$lte': crash['datetime'] + timedelta(minutes=10)}
+            'datetime': {'$gte': crash['datetime'] - td,
+                         '$lte': crash['datetime'] + td}
         })
         crashes[i]['anomalies'] = list(anomalies)
         crashes[i]['sites'] = sites
