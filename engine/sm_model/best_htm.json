@@ -1,0 +1,111 @@
+{
+    "aggregationInfo": {
+        "seconds": 0,
+        "fields": [],
+        "months": 0,
+        "days": 0,
+        "years": 0,
+        "hours": 0,
+        "microseconds": 0,
+        "weeks": 0,
+        "minutes": 0,
+        "milliseconds": 0
+    },
+    "model": "HTMPrediction",
+    "version": 1,
+    "predictAheadTime": null,
+    "modelParams": {
+        "sensorParams": {
+            "verbosity": 0,
+            "encoders": {
+                "phase_time": {
+                    "type": "RandomDistributedScalarEncoder",
+                    "resolution": 6.53125,
+                    "fieldname": "phase_time",
+                    "name": "phase_time"
+                },
+                "datetime_timeOfDay": {
+                    "type": "DateEncoder",
+                    "timeOfDay": [
+                        45,
+                        9.694412416067948
+                    ],
+                    "fieldname": "datetime",
+                    "name": "datetime_timeOfDay"
+                },
+                "datetime_weekend": {
+                    "weekend": 71,
+                    "fieldname": "datetime",
+                    "name": "datetime_weekend",
+                    "type": "DateEncoder"
+                },
+                "measured_flow": {
+                    "type": "RandomDistributedScalarEncoder",
+                    "resolution": 18.8,
+                    "fieldname": "measured_flow",
+                    "name": "measured_flow"
+                },
+                "datetime_dayOfWeek": {
+                    "dayOfWeek": [
+                        73,
+                        12.443279469627353
+                    ],
+                    "type": "DateEncoder",
+                    "fieldname": "datetime",
+                    "name": "datetime_dayOfWeek"
+                }
+            },
+            "sensorAutoReset": null
+        },
+        "anomalyParams": {
+            "anomalyCacheRecords": null,
+            "autoDetectThreshold": null,
+            "autoDetectWaitRecords": null
+        },
+        "spParams": {
+            "columnCount": 1024,
+            "spVerbosity": 0,
+            "spatialImp": "cpp",
+            "inputWidth": 0,
+            "synPermInactiveDec": 0.03778329392511107,
+            "synPermConnected": 0.12123538432633398,
+            "synPermActiveInc": 0.0396968154724738,
+            "seed": 1956,
+            "numActiveColumnsPerInhArea": 47,
+            "boostStrength": 0.018963618954461796,
+            "globalInhibition": 1,
+            "potentialPct": 0.586286463076305
+        },
+        "trainSPNetOnlyIfRequested": false,
+        "clParams": {
+            "alpha": 0.09050550452606848,
+            "verbosity": 0,
+            "steps": "1",
+            "regionName": "SDRClassifierRegion"
+        },
+        "tmParams": {
+            "columnCount": 1024,
+            "activationThreshold": 9,
+            "pamLength": 7,
+            "cellsPerColumn": 24,
+            "permanenceInc": 0.06599083216126164,
+            "minThreshold": 23,
+            "verbosity": 0,
+            "maxSynapsesPerSegment": 50,
+            "outputType": "normal",
+            "globalDecay": 0.0,
+            "initialPerm": 0.3161850113494048,
+            "permanenceDec": 0.19169320472791665,
+            "seed": 1960,
+            "maxAge": 0,
+            "newSynapseCount": 23,
+            "maxSegmentsPerCell": 40,
+            "temporalImp": "cpp",
+            "inputWidth": 1024
+        },
+        "tmEnable": true,
+        "clEnable": true,
+        "spEnable": true,
+        "inferenceType": "TemporalMultiStep"
+    }
+}

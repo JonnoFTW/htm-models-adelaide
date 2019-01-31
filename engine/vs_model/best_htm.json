@@ -1,0 +1,316 @@
+{
+    "aggregationInfo": {
+        "seconds": 0,
+        "fields": [],
+        "months": 0,
+        "days": 0,
+        "years": 0,
+        "hours": 0,
+        "microseconds": 0,
+        "weeks": 0,
+        "minutes": 0,
+        "milliseconds": 0
+    },
+    "model": "HTMPrediction",
+    "version": 1,
+    "predictAheadTime": null,
+    "modelParams": {
+        "sensorParams": {
+            "verbosity": 0,
+            "encoders": {
+                "datetime_timeOfDay": {
+                    "type": "DateEncoder",
+                    "timeOfDay": [
+                        55,
+                        11.389925472016568
+                    ],
+                    "fieldname": "datetime",
+                    "name": "datetime_timeOfDay"
+                },
+                "flow": {
+                    "type": "RandomDistributedScalarEncoder",
+                    "resolution": 89.25,
+                    "fieldname": "flow",
+                    "name": "flow"
+                },
+                "datetime_weekend": {
+                    "weekend": [
+                        127,
+                        12.654411787919452
+                    ],
+                    "fieldname": "datetime",
+                    "name": "datetime_weekend",
+                    "type": "DateEncoder"
+                },
+                "datetime_holiday": {
+                    "type": "DateEncoder",
+                    "holiday": 133,
+                    "fieldname": "datetime",
+                    "name": "datetime_holiday",
+                    "holidays": [
+                        [
+                            2015,
+                            12,
+                            25
+                        ],
+                        [
+                            2016,
+                            12,
+                            31
+                        ],
+                        [
+                            2015,
+                            10,
+                            5
+                        ],
+                        [
+                            2015,
+                            4,
+                            6
+                        ],
+                        [
+                            2017,
+                            1,
+                            26
+                        ],
+                        [
+                            2016,
+                            12,
+                            27
+                        ],
+                        [
+                            2016,
+                            4,
+                            25
+                        ],
+                        [
+                            2015,
+                            6,
+                            8
+                        ],
+                        [
+                            2015,
+                            4,
+                            4
+                        ],
+                        [
+                            2015,
+                            3,
+                            9
+                        ],
+                        [
+                            2015,
+                            1,
+                            1
+                        ],
+                        [
+                            2017,
+                            4,
+                            14
+                        ],
+                        [
+                            2017,
+                            4,
+                            17
+                        ],
+                        [
+                            2015,
+                            1,
+                            26
+                        ],
+                        [
+                            2016,
+                            3,
+                            14
+                        ],
+                        [
+                            2017,
+                            10,
+                            2
+                        ],
+                        [
+                            2017,
+                            12,
+                            31
+                        ],
+                        [
+                            2017,
+                            6,
+                            12
+                        ],
+                        [
+                            2017,
+                            1,
+                            1
+                        ],
+                        [
+                            2017,
+                            12,
+                            25
+                        ],
+                        [
+                            2016,
+                            10,
+                            3
+                        ],
+                        [
+                            2015,
+                            4,
+                            25
+                        ],
+                        [
+                            2017,
+                            3,
+                            13
+                        ],
+                        [
+                            2017,
+                            4,
+                            25
+                        ],
+                        [
+                            2017,
+                            12,
+                            24
+                        ],
+                        [
+                            2015,
+                            4,
+                            3
+                        ],
+                        [
+                            2016,
+                            3,
+                            26
+                        ],
+                        [
+                            2016,
+                            12,
+                            24
+                        ],
+                        [
+                            2016,
+                            3,
+                            25
+                        ],
+                        [
+                            2016,
+                            3,
+                            28
+                        ],
+                        [
+                            2016,
+                            12,
+                            26
+                        ],
+                        [
+                            2015,
+                            12,
+                            31
+                        ],
+                        [
+                            2017,
+                            4,
+                            15
+                        ],
+                        [
+                            2016,
+                            1,
+                            26
+                        ],
+                        [
+                            2016,
+                            1,
+                            1
+                        ],
+                        [
+                            2015,
+                            12,
+                            24
+                        ],
+                        [
+                            2017,
+                            1,
+                            2
+                        ],
+                        [
+                            2016,
+                            6,
+                            13
+                        ],
+                        [
+                            2015,
+                            12,
+                            28
+                        ],
+                        [
+                            2017,
+                            12,
+                            26
+                        ]
+                    ]
+                },
+                "datetime_dayOfWeek": {
+                    "dayOfWeek": [
+                        133,
+                        11.099369381130948
+                    ],
+                    "type": "DateEncoder",
+                    "fieldname": "datetime",
+                    "name": "datetime_dayOfWeek"
+                }
+            },
+            "sensorAutoReset": null
+        },
+        "anomalyParams": {
+            "anomalyCacheRecords": null,
+            "autoDetectThreshold": null,
+            "autoDetectWaitRecords": null
+        },
+        "spParams": {
+            "columnCount": 2048,
+            "spVerbosity": 0,
+            "spatialImp": "cpp",
+            "inputWidth": 0,
+            "synPermInactiveDec": 0.06321542545086611,
+            "synPermConnected": 0.05762102903677198,
+            "synPermActiveInc": 0.08360575341845242,
+            "seed": 1956,
+            "numActiveColumnsPerInhArea": 56,
+            "boostStrength": 0.007220744757166206,
+            "globalInhibition": 1,
+            "potentialPct": 0.7573713625971066
+        },
+        "trainSPNetOnlyIfRequested": false,
+        "clParams": {
+            "alpha": 0.04423326056698039,
+            "verbosity": 0,
+            "steps": "1",
+            "regionName": "SDRClassifierRegion"
+        },
+        "tmParams": {
+            "columnCount": 2048,
+            "activationThreshold": 8,
+            "pamLength": 5,
+            "cellsPerColumn": 14,
+            "permanenceInc": 0.05875552578940036,
+            "minThreshold": 31,
+            "verbosity": 0,
+            "maxSynapsesPerSegment": 50,
+            "outputType": "normal",
+            "globalDecay": 0.0,
+            "initialPerm": 0.11619888545169564,
+            "permanenceDec": 0.05872729523847874,
+            "seed": 1960,
+            "maxAge": 0,
+            "newSynapseCount": 33,
+            "maxSegmentsPerCell": 44,
+            "temporalImp": "cpp",
+            "inputWidth": 2048
+        },
+        "tmEnable": true,
+        "clEnable": true,
+        "spEnable": true,
+        "inferenceType": "TemporalMultiStep"
+    }
+}
