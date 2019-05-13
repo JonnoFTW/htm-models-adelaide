@@ -1,5 +1,10 @@
 pyramid
 pyramid_mako
-pyramid_chameleon
 pyramid_debugtoolbar
 waitress
+geopy
+ldap3
+numpy
+bcrypt
+numba
+matplotlib

@@ -1,3 +1,6 @@
+scikit-learn
+geopy
+bcrypt
 nupic
 pluck
 pyramid
@@ -8,3 +11,4 @@ pyyaml
 mako
 pyprind
 matplotlib
+ldap3

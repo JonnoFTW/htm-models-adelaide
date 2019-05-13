@@ -52,3 +52,4 @@ connection.yaml
 pip-log.txt
 pip-delete-this-directory.txt
 /htm-site/.python-version
+htmsite/assets/missing.png

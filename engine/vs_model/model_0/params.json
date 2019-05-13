@@ -1,0 +1,94 @@
+{
+  "aggregationInfo": {
+    "hours": 0,
+    "microseconds": 0,
+    "seconds": 0,
+    "fields": [],
+    "weeks": 0,
+    "months": 0,
+    "minutes": 0,
+    "days": 0,
+    "milliseconds": 0,
+    "years": 0
+  },
+  "model": "HTMPrediction",
+  "version": 1,
+  "predictAheadTime": null,
+  "modelParams": {
+    "sensorParams": {
+      "verbosity": 0,
+      "encoders": {
+        "_classifierInput": {
+          "classifierOnly": true,
+          "name": "_classifierInput",
+          "resolution": 21,
+          "fieldname": "flow",
+          "w": 21,
+          "type": "RandomDistributedScalarEncoder"
+        },
+        "datetime_timeOfDay": null,
+        "flow": null,
+        "datetime_dayOfWeek": {
+          "dayOfWeek": [
+            21,
+            1.0
+          ],
+          "type": "DateEncoder",
+          "fieldname": "datetime",
+          "name": "datetime"
+        },
+        "datetime_weekend": null
+      },
+      "sensorAutoReset": null
+    },
+    "anomalyParams": {
+      "anomalyCacheRecords": null,
+      "autoDetectThreshold": null,
+      "autoDetectWaitRecords": null
+    },
+    "spParams": {
+      "columnCount": 1024,
+      "spVerbosity": 0,
+      "spatialImp": "cpp",
+      "synPermConnected": 0.1,
+      "seed": 1956,
+      "numActiveColumnsPerInhArea": 40,
+      "globalInhibition": 1,
+      "inputWidth": 0,
+      "synPermInactiveDec": 0.1,
+      "synPermActiveInc": 0.08000000000000002,
+      "potentialPct": 0.25,
+      "boostStrength": 0.0
+    },
+    "spEnable": true,
+    "clParams": {
+      "alpha": 0.0001,
+      "verbosity": 0,
+      "steps": "1,2",
+      "regionName": "SDRClassifierRegion"
+    },
+    "inferenceType": "TemporalMultiStep",
+    "trainSPNetOnlyIfRequested": false,
+    "tmParams": {
+      "columnCount": 1024,
+      "activationThreshold": 12,
+      "pamLength": 1,
+      "cellsPerColumn": 32,
+      "permanenceInc": 0.1,
+      "minThreshold": 9,
+      "verbosity": 0,
+      "maxSynapsesPerSegment": 32,
+      "outputType": "normal",
+      "initialPerm": 0.21,
+      "globalDecay": 0.0,
+      "maxAge": 0,
+      "permanenceDec": 0.1,
+      "seed": 1960,
+      "newSynapseCount": 20,
+      "maxSegmentsPerCell": 128,
+      "temporalImp": "cpp",
+      "inputWidth": 1024
+    },
+    "tmEnable": true
+  }
+}

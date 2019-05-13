@@ -6,7 +6,7 @@ import matplotlib
 matplotlib.rc('font', **font)
 from matplotlib.dates import DateFormatter, DayLocator
 import matplotlib.pyplot as plt
-from datetime import timedelta
+from datetime import timedelta, datetime
 from collections import OrderedDict
 import numpy as np
 import os
@@ -16,14 +16,15 @@ from metrics import geh, mape, rmse
 
 metrics = []
 figs = []
-# for i in [
-#     # ('pred_data/3002-batch.npz', 'LSTM-Batch'),
-#     # ('pred_data/lane_data_3002_3001.csv-htm-pred-data.npz', 'HTM'),
-#     # ('pred_data/3002-all-sensor-test-seq-50.npz', 'LSTM-Online'),
-#     ('pred_data/3002-all-sensor-test-seq-1.npz', 'LSTM-Online 1')
-# ]:
-
-for i in [('pred_data/3002-all-sensor-test-seq-35.npz', 'LSTM-Online')]: # glob.glob('pred_data/3002-all-sensor-test*'):
+for i in [
+    ('pred_data/3002-batch.npz', 'LSTM-Batch'),
+    ('pred_data/lane_data_3002_3001.csv-htm-pred-data.npz', 'HTM'),
+    # ('pred_data/lane_data_3002_3001.csv-htm-pred-data.npz', 'HTM'),
+    ('pred_data/3002-all-sensor-test-seq-1.npz', 'LSTM-Online 1'),
+    # ('pred_data/3002-all-sensor-test-seq-inf.npz', 'LSTM-Online inf'),
+    # ('pred_data/3002-all-sensor-test-seq-10.npz', 'LSTM-Online 10'),
+    # ('pred_data/3002-all-sensor-test-seq-35.npz', 'LSTM-Online')
+]:
 
     fname = i[0]
     title = i[1]
@@ -40,7 +41,9 @@ for i in [('pred_data/3002-all-sensor-test-seq-35.npz', 'LSTM-Online')]: # glob.
 
     start = data['true_x'][0]
     end = data['true_x'][-1]
-    #
+    # start = datetime(2013,5,10)
+    # end = datetime(2013,5,11)
+
     # print('GEH',   geh(data['true_y'], data['pred_y']))
     # print('RMSE', rmse(data['true_y'], data['pred_y']))
     # print('MAPE', mape(data['true_y'], data['pred_y']))
@@ -51,9 +54,20 @@ for i in [('pred_data/3002-all-sensor-test-seq-35.npz', 'LSTM-Online')]: # glob.
     current = start
     full_true = OrderedDict()
     full_pred = OrderedDict()
+    full_err = OrderedDict()
     while current <= end:
         full_true[current] = true_xy_dict.get(current, np.nan)
         full_pred[current] = pred_xy_dict.get(current, np.nan)
+        if pred_xy_dict.get(current) is None or true_xy_dict.get(current) is None:
+            full_err[current] = np.nan
+        else:
+
+            err = rmse(np.array([true_xy_dict.get(current)]),
+                       np.array([pred_xy_dict.get(current)]), axis=0)
+            if isinstance(err, np.ndarray):
+                err = err[0]
+
+            full_err[current] = err
         current += timedelta(minutes=5)
 
     start = 16 * 288
@@ -62,15 +76,20 @@ for i in [('pred_data/3002-all-sensor-test-seq-35.npz', 'LSTM-Online')]: # glob.
     true_y = full_true.values()[start:end]
     pred_x = full_true.keys()[start:end]
     pred_y = full_pred.values()[start:end]
+    err_x = full_err.keys()[start:end]
+    err_y = full_err.values()[start:end]
     invalids = true_y == -1
     true_y[invalids] = np.nan
     pred_y[invalids] = np.nan
+    err_y[invalids] = np.nan
 
-    fig, ax = plt.subplots()
+    fig, ax1 = plt.subplots()
+
     figs.append(fig)
 
     plt.plot(true_x, true_y, 'b-', label='Readings')
     plt.plot(pred_x, pred_y, 'r-', label=title + ' Predictions')
+    # ax2 = ax1.twinx()
 
     plt.legend(prop={'size': 23})
     plt.grid(b=True, which='major', color='black', linestyle='-')
@@ -78,21 +97,25 @@ for i in [('pred_data/3002-all-sensor-test-seq-35.npz', 'LSTM-Online')]: # glob.
 
     xmajor_fmt = DateFormatter('%-d %b')
     xmajor_locator = DayLocator(interval=1)
-    ax.xaxis.set_major_formatter(xmajor_fmt)
-    ax.xaxis.set_major_locator(xmajor_locator)
+    ax1.xaxis.set_major_formatter(xmajor_fmt)
+    ax1.xaxis.set_major_locator(xmajor_locator)
     fig.subplots_adjust(bottom=0.13)
-    df = "%A %d %B, %Y"
-    plt.title("3002: Traffic Flow from {} to {}".format(true_x[0].strftime(df), true_x[-1].strftime(df)), y=1.03)
-    plt.legend()
+    df = "%d %B"
+    # plt.title("3002: Traffic Flow from {} to {}".format(true_x[0].strftime(df), true_x[-1].strftime(df)), y=1.03)
+    plt.title("3002: Traffic Flow from 10 May 2013 to 11 May 2013", y=1.03)
 
+    plt.plot(err_x, err_y, 'g-', label='RMSE')
     plt.ylabel("Vehicles/ 5 min")
     plt.xlabel("Time")
-    for tick in ax.xaxis.get_major_ticks():
+    for tick in ax1.xaxis.get_major_ticks():
         tick.label.set_fontsize(26)
         tick.label.set_rotation('vertical')
 
+    # ax2.set_ylabel('RMSE', color='g')
+    plt.legend()
 fig, ax = plt.subplots()
 figs.append(fig)
+# exit()
 plt.ylabel("RMSE")
 plt.xlabel("Sequence Length")
 plt.title("Training Loss vs. Sequence Length")
@@ -119,6 +142,6 @@ sequence_length_loss = OrderedDict([
 from pluck import pluck
 
 for key in ['tr', 'GEH', 'MAPE', 'RMSE']:
-    plt.plot(sequence_length_loss.keys(), map(lambda x: x ** 0.5, pluck(sequence_length_loss.values(),key)),label=key)
+    plt.plot(sequence_length_loss.keys(), map(lambda x: x ** 0.5, pluck(sequence_length_loss.values(), key)), label=key)
 
 plt.show()

@@ -255,7 +255,8 @@ def create_model(rows, _max_flow):
     print("Save image to", fig_name)
     bytes_out = BytesIO()
     plt.savefig(bytes_out, format='png')
-
+    pkl_out = BytesIO()
+    pickle.dump({'true_x':actual_x, 'true_y':actual_y, 'pred_x': pred_x, 'pred_y': pred_y}, pkl_out)
     print("RMSE: {} in {}s".format(*metric_results.values()))
 
     return {
@@ -263,7 +264,8 @@ def create_model(rows, _max_flow):
         'status': STATUS_OK,
         'model': params,
         'metrics': metric_results,
-        'figure': Binary(bytes_out.getvalue())
+        'figure': Binary(bytes_out.getvalue()),
+        'pred_data': Binary(pkl_out.getvalue())
     }
 
 

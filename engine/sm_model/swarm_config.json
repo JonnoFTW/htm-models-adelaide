@@ -1,0 +1,76 @@
+{
+  "includedFields": [
+    {
+      "fieldName": "datetime",
+      "fieldType": "datetime"
+    },
+    {
+      "fieldName": "cycle_time",
+      "fieldType": "int",
+      "maxValue": 190,
+      "minValue": 0
+    },
+    {
+      "fieldName": "flow",
+      "fieldType": "int",
+      "maxValue": 100,
+      "minValue": 0
+    }
+  ],
+  "inferenceType": "TemporalMultiStep",
+  "inferenceArgs": {
+    "predictionSteps": [
+      1,
+      2
+    ],
+    "predictedField": "flow"
+  },
+  "streamDef": {
+    "info": "StrategicInput flow per phase",
+    "streams": [
+      {
+        "columns": [
+          "datetime",
+          "flow",
+          "cycle_time"
+        ],
+        "last_record": 500,
+        "info": "Traffic flow through intersection 113 SI 108",
+        "source": "file:///scratch/Dropbox/PhD/htm_models_adelaide/engine/sm_model/swarm_data/113_108.csv"
+      }
+    ],
+    "version": 1
+  },
+  "customErrorMetric": {
+    "field": "flow",
+    "metric": "multiStep",
+    "logged": true,
+    "inferenceElement": "multiStepBestPredictions",
+    "params": {
+      "errorMetric": "rmse",
+      "window": 100,
+      "steps": [
+        1,
+        2
+      ]
+    }
+  },
+  "iterationCount": -1,
+  "swarmSize": "medium",
+  "metrics": [
+    {
+      "field": "flow",
+      "metric": "multiStep",
+      "logged": true,
+      "inferenceElement": "multiStepBestPredictions",
+      "params": {
+        "errorMetric": "rmse",
+        "window": 100,
+        "steps": [
+          1,
+          2
+        ]
+      }
+    }
+  ]
+}

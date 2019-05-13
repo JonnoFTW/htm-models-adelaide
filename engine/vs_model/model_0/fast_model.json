@@ -1,0 +1,498 @@
+{
+  "misc": {
+    "tid": 3991,
+    "idxs": {
+      "maxSynapsesPerSegment": [
+        3991
+      ],
+      "dayOfWeek_radius_2": [
+        3991
+      ],
+      "holiday_width": [
+        3991
+      ],
+      "maxSegmentsPerCell": [
+        3991
+      ],
+      "activationThreshold": [
+        3991
+      ],
+      "dayOfWeek_radius": [
+        3991
+      ],
+      "permanenceDec": [
+        3991
+      ],
+      "weekend_width": [
+        3991
+      ],
+      "timeOfDay_width": [
+        3991
+      ],
+      "potentialPct": [
+        3991
+      ],
+      "dayOfWeek_width": [
+        3991
+      ],
+      "boost": [
+        3991
+      ],
+      "pamLength": [
+        3991
+      ],
+      "initialPerm": [
+        3991
+      ],
+      "synPermConnected": [
+        3991
+      ],
+      "activeColumns": [
+        3991
+      ],
+      "alpha": [
+        3991
+      ],
+      "tmPermanenceInc": [
+        3991
+      ],
+      "cellsPerColumn": [
+        3991
+      ],
+      "minThreshold": [
+        3991
+      ],
+      "synPermInactiveDec": [
+        3991
+      ],
+      "synPermActiveInc": [
+        3991
+      ],
+      "newSynapseRatio": [
+        3991
+      ],
+      "flow_buckets": [
+        3991
+      ],
+      "dayOfWeek_radius_1": [
+        3991
+      ]
+    },
+    "cmd": [
+      "domain_attachment",
+      "FMinIter_Domain"
+    ],
+    "vals": {
+      "maxSynapsesPerSegment": [
+        38.0
+      ],
+      "dayOfWeek_radius_2": [
+        9.807315144154115
+      ],
+      "holiday_width": [
+        90.0
+      ],
+      "maxSegmentsPerCell": [
+        38.0
+      ],
+      "activationThreshold": [
+        7.0
+      ],
+      "dayOfWeek_radius": [
+        7.2572541306434415
+      ],
+      "permanenceDec": [
+        0.0654893984596667
+      ],
+      "weekend_width": [
+        94.0
+      ],
+      "timeOfDay_width": [
+        152.0
+      ],
+      "potentialPct": [
+        0.23936608659610906
+      ],
+      "dayOfWeek_width": [
+        126.0
+      ],
+      "boost": [
+        0.03634345692023021
+      ],
+      "pamLength": [
+        8.0
+      ],
+      "initialPerm": [
+        0.2986447398670706
+      ],
+      "synPermConnected": [
+        0.21986380786098242
+      ],
+      "activeColumns": [
+        24.0
+      ],
+      "alpha": [
+        0.13435311052775517
+      ],
+      "tmPermanenceInc": [
+        0.18615325171917302
+      ],
+      "cellsPerColumn": [
+        12.0
+      ],
+      "minThreshold": [
+        24.0
+      ],
+      "synPermInactiveDec": [
+        0.004472562339883307
+      ],
+      "synPermActiveInc": [
+        0.05243115586040661
+      ],
+      "newSynapseRatio": [
+        0.6544760163615612
+      ],
+      "flow_buckets": [
+        1.0
+      ],
+      "dayOfWeek_radius_1": [
+        8.081935634874565
+      ]
+    },
+    "workdir": null
+  },
+  "state": 2,
+  "tid": 3991,
+  "exp_key": "htm_115_2_mgeh_loss_holidays",
+  "version": 3,
+  "result": {
+    "status": "ok",
+    "loss": 1.1396095146439347,
+    "model": {
+      "aggregationInfo": {
+        "seconds": 0,
+        "fields": [
+        ],
+        "months": 0,
+        "days": 0,
+        "years": 0,
+        "hours": 0,
+        "microseconds": 0,
+        "weeks": 0,
+        "minutes": 0,
+        "milliseconds": 0
+      },
+      "model": "HTMPrediction",
+      "version": 1,
+      "predictAheadTime": null,
+      "modelParams": {
+        "sensorParams": {
+          "verbosity": 0,
+          "encoders": {
+            "datetime_timeOfDay": {
+              "type": "DateEncoder",
+              "timeOfDay": [
+                153,
+                8.081935634874565
+              ],
+              "fieldname": "datetime",
+              "name": "datetime_timeOfDay"
+            },
+            "flow": {
+              "type": "RandomDistributedScalarEncoder",
+              "resolution": 5.0,
+              "fieldname": "flow",
+              "name": "flow"
+            },
+            "datetime_weekend": {
+              "weekend": [
+                95,
+                9.807315144154115
+              ],
+              "fieldname": "datetime",
+              "name": "datetime_weekend",
+              "type": "DateEncoder"
+            },
+            "datetime_holiday": {
+              "type": "DateEncoder",
+              "holiday": 91,
+              "fieldname": "datetime",
+              "name": "datetime_holiday",
+              "holidays": [
+                [
+                  2015,
+                  12,
+                  25
+                ],
+                [
+                  2016,
+                  12,
+                  31
+                ],
+                [
+                  2015,
+                  10,
+                  5
+                ],
+                [
+                  2015,
+                  4,
+                  6
+                ],
+                [
+                  2017,
+                  1,
+                  26
+                ],
+                [
+                  2016,
+                  12,
+                  27
+                ],
+                [
+                  2016,
+                  4,
+                  25
+                ],
+                [
+                  2015,
+                  6,
+                  8
+                ],
+                [
+                  2015,
+                  4,
+                  4
+                ],
+                [
+                  2015,
+                  3,
+                  9
+                ],
+                [
+                  2015,
+                  1,
+                  1
+                ],
+                [
+                  2017,
+                  4,
+                  14
+                ],
+                [
+                  2017,
+                  4,
+                  17
+                ],
+                [
+                  2015,
+                  1,
+                  26
+                ],
+                [
+                  2016,
+                  3,
+                  14
+                ],
+                [
+                  2017,
+                  10,
+                  2
+                ],
+                [
+                  2017,
+                  12,
+                  31
+                ],
+                [
+                  2017,
+                  6,
+                  12
+                ],
+                [
+                  2017,
+                  1,
+                  1
+                ],
+                [
+                  2017,
+                  12,
+                  25
+                ],
+                [
+                  2016,
+                  10,
+                  3
+                ],
+                [
+                  2015,
+                  4,
+                  25
+                ],
+                [
+                  2017,
+                  3,
+                  13
+                ],
+                [
+                  2017,
+                  4,
+                  25
+                ],
+                [
+                  2017,
+                  12,
+                  24
+                ],
+                [
+                  2015,
+                  4,
+                  3
+                ],
+                [
+                  2016,
+                  3,
+                  26
+                ],
+                [
+                  2016,
+                  12,
+                  24
+                ],
+                [
+                  2016,
+                  3,
+                  25
+                ],
+                [
+                  2016,
+                  3,
+                  28
+                ],
+                [
+                  2016,
+                  12,
+                  26
+                ],
+                [
+                  2015,
+                  12,
+                  31
+                ],
+                [
+                  2017,
+                  4,
+                  15
+                ],
+                [
+                  2016,
+                  1,
+                  26
+                ],
+                [
+                  2016,
+                  1,
+                  1
+                ],
+                [
+                  2015,
+                  12,
+                  24
+                ],
+                [
+                  2017,
+                  1,
+                  2
+                ],
+                [
+                  2016,
+                  6,
+                  13
+                ],
+                [
+                  2015,
+                  12,
+                  28
+                ],
+                [
+                  2017,
+                  12,
+                  26
+                ]
+              ]
+            },
+            "datetime_dayOfWeek": {
+              "dayOfWeek": [
+                127,
+                7.2572541306434415
+              ],
+              "type": "DateEncoder",
+              "fieldname": "datetime",
+              "name": "datetime_dayOfWeek"
+            }
+          },
+          "sensorAutoReset": null
+        },
+        "anomalyParams": {
+          "anomalyCacheRecords": null,
+          "autoDetectThreshold": null,
+          "autoDetectWaitRecords": null
+        },
+        "spParams": {
+          "columnCount": 2048,
+          "spVerbosity": 0,
+          "spatialImp": "cpp",
+          "inputWidth": 0,
+          "synPermInactiveDec": 0.004472562339883307,
+          "synPermConnected": 0.21986380786098242,
+          "synPermActiveInc": 0.05243115586040661,
+          "seed": 1956,
+          "numActiveColumnsPerInhArea": 24,
+          "boostStrength": 0.03634345692023021,
+          "globalInhibition": 1,
+          "potentialPct": 0.23936608659610906
+        },
+        "trainSPNetOnlyIfRequested": false,
+        "clParams": {
+          "alpha": 0.01935311052775517,
+          "verbosity": 0,
+          "steps": "1",
+          "regionName": "SDRClassifierRegion"
+        },
+        "tmParams": {
+          "columnCount": 2048,
+          "activationThreshold": 7,
+          "pamLength": 8,
+          "cellsPerColumn": 12,
+          "permanenceInc": 0.18615325171917302,
+          "minThreshold": 24,
+          "verbosity": 0,
+          "maxSynapsesPerSegment": 38,
+          "outputType": "normal",
+          "globalDecay": 0.0,
+          "initialPerm": 0.2986447398670706,
+          "permanenceDec": 0.0654893984596667,
+          "seed": 1960,
+          "maxAge": 0,
+          "newSynapseCount": 24,
+          "maxSegmentsPerCell": 38,
+          "temporalImp": "cpp",
+          "inputWidth": 2048
+        },
+        "tmEnable": true,
+        "clEnable": true,
+        "spEnable": true,
+        "inferenceType": "TemporalMultiStep"
+      }
+    },
+    "metrics": {
+      "duration": 851.024446,
+      "mgeh": 1.1396095146439347,
+      "rmse": 9.357203098787938
+    },
+    "owner": [
+      "42y8h32-l:20379"
+    ],
+    "spec": null
+  }
+}

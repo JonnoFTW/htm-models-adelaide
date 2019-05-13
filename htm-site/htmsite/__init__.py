@@ -2,6 +2,7 @@ from pyramid.authentication import AuthTktAuthenticationPolicy
 from pyramid.authorization import ACLAuthorizationPolicy
 from pyramid.security import unauthenticated_userid
 import logging
+
 log = logging.getLogger(__name__)
 
 import json
@@ -11,7 +12,6 @@ from pyramid.config import Configurator
 
 
 def main(global_config, **settings):
-
     import os
     if 'mongo_uri' in settings:
         db_url = urlparse(settings['mongo_uri'])
@@ -27,6 +27,7 @@ def main(global_config, **settings):
     config = Configurator(settings=settings)
     config.include('pyramid_mako')
     log.debug('Settings are: \n{}'.format(json.dumps(settings, indent=4)))
+
     def add_db(request):
         conn = MongoClient(db_url.geturl(),
                            serverSelectionTimeoutMS=10000,
@@ -71,6 +72,7 @@ def main(global_config, **settings):
     config.add_route('intersection_info', '/intersection_{intersection}.json')
     config.add_route('readings_anomaly_json', '/get_readings_anomaly_{intersection}.json')
     config.add_route('get_anomalies_json', '/get_anomaly_{intersection}.json')
+    config.add_route('readings_vs_sm_anomalies', '/readings_vs_sm_anomalies')
 
     config.add_route('reports', '/reports/{intersection}/{report}')
 

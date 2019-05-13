@@ -37,15 +37,13 @@ del intersection['_id']
                     </thead>
                     <tbody>
                         % for k,v in intersection.items():
-                            <%
-                                ##                             print k,v
-                            %>
                             <tr>
-                                % if k in ['scats_diagram']:
+##                                 % if k in ['scats_diagram']:
                                     <%
-                                        continue
+                                        if k =='scats_diagram':
+                                            continue
                                     %>
-                                % endif
+##                                 % endif
                                 <td>${k.replace('_',' ').title()}</td>
                                 <td>
                                     % if k == 'neighbours':
@@ -107,7 +105,7 @@ del intersection['_id']
                                                                 %for sensor in sorted(intersection['sensors'], key=lambda x: int(x)):
                                                                 <% sensor = int(sensor) %>
                                                                 ## sensors on the this end
-                                                                    <option ${"selected" if   nid in intersection['neighbours_sensors'] and sensor in intersection['neighbours_sensors'][nid]['to'] else ""}
+                                                                    <option ${"selected" if nid in intersection['neighbours_sensors'] and sensor in intersection['neighbours_sensors'][nid]['to'] else ""}
                                                                             value="${sensor}">${sensor}</option>
                                                                 % endfor
                                                             %endif
@@ -333,6 +331,18 @@ del intersection['_id']
         </div>
     %endif
     <div class="row">
+        <div class="col-lg-12">
+            <div class="panel panel-default">
+                     <div class="panel-heading">
+                        <i class="fa fa-line-chart fa-fw"></i>Strategic Input Flow
+                    </div>
+                    <div class="panel-body">
+                        <div id="si-plot" style="height:300px" ></div>
+                    </div>
+                </div>
+        </div>
+    </div>
+    <div class="row">
         <div class="col-lg-6">
             <div class="panel panel-default">
                 <div class="panel-heading">
@@ -395,7 +405,46 @@ del intersection['_id']
         ##          %endif
             </div>
 </div>
+<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
 <script type="text/javascript">
+
+    google.charts.load('current', {'packages':['corechart']});
+
+    google.charts.setOnLoadCallback(drawVisualization);
+
+    function drawVisualization(from, to) {
+        if (from === undefined) {
+            from = ${mkunix(time_start)};
+        }
+        if(to === undefined) {
+            to = ${mkunix(time_end)};
+        }
+        $.getJSON('${request.route_url('readings_vs_sm_anomalies')}', {
+            to:to,
+            from:from,
+            si:${list(intersection['strategic_inputs'][0]['si'].keys())[0]},
+            site: ${intersection['site_no']},
+        },function(d) {
+            var data = google.visualization.arrayToDataTable(d);
+
+            var options = {
+                title: 'Strategic Input Flow',
+                vAxis: {title: 'Flow'},
+                hAxis: {title: 'Date/Time'},
+                legend: {position: 'bottom'},
+                interpolateNulls: true
+                ##  series: {3: {type: 'scatter'}},
+                ##  series: {4: {type: 'scatter'}},
+                ##  series: {5: {type: 'scatter'}},
+                ##  series: {6: {type: 'scatter'}},
+                ##  series: {7: {type: 'scatter'}},
+            };
+
+            var chart = new google.visualization.LineChart(document.getElementById('si-plot'));
+            chart.draw(data, options);
+        });
+
+    }
     var None = null;
     var True = true;
     var mainMap = false;
@@ -549,6 +598,7 @@ del intersection['_id']
         var modelRunning = ${'running' in intersection};
         var loadData = function (from, to, callback) {
             console.log("Loading data from json", from, to);
+            drawVisualization(from, to);
             var args = {
                 'from': from,
                 'to': to,
@@ -902,9 +952,7 @@ del intersection['_id']
 
         };
         $(document).ready(function () {
-            if (${scores_count}>
-            0
-        )
+            if (${scores_count}> 0)
             setupDygraphs();
             $('.shift-data').click(function (e) {
                 // determine if we are older or newer
@@ -912,14 +960,14 @@ del intersection['_id']
                 var from, to;
                 if (older) {
                     to = predictionChart.getValue(0, 0) / 1000; // lowest reading
-                    from = to - (${day_range}* 24 * 60 * 60
-                )
+                    from = to - (${day_range}* 24 * 60 * 60);
+
                     ;// lowest reading in chart - ${day_range} days
                 } else {
                     to = predictionChart.getValue(predictionChart.numRows() - 1, 0) / 1000;
-                    from = to + (${day_range}* 24 * 60 * 60
-                )
-                    ;
+                    from = to + (${day_range}* 24 * 60 * 60);
+
+
                 }
                 loadData(from, to, setChartsFromMake);
                 // load accidents from the new timeframe too
@@ -1043,7 +1091,6 @@ del intersection['_id']
             }
         })
     });
-
     $('.pop').on('click', function () {
         $('.imagepreview').attr('src', $(this).find('img').attr('src'));
         $('#imagemodal').modal('show').on('click', function () {
@@ -1051,10 +1098,5 @@ del intersection['_id']
         });
 
     });
-
-
-        <%include file="neighbour_save.mako" />
-
+<%include file="neighbour_save.mako" />
 </script>
-
-

@@ -1,5 +1,6 @@
 from dask.distributed import Client
 from tabulate import tabulate
+import matplotlib.pyplot as plt
 import gzip
 from collections import defaultdict, Counter
 from datetime import datetime
@@ -85,23 +86,31 @@ def do_model(args):
     return bins, order, (datetime.now() - start).total_seconds(), len(
         vs_df), vs_model.missing_count_during_learning, round(
         float(vs_model.missing_count_during_learning) / len(vs_df) * 100, 3), scheme_names[scheme], (
-                   (vs_df['markov_pred'] - vs_df['flow']) ** 2).mean() ** .5
+                   (vs_df['markov_pred'] - vs_df['flow']) ** 2).mean() ** .5, vs_df
 
 
 if __name__ == "__main__":
 
-    client = Client('10.27.41.41:8786')
-
+    # client = Client('10.27.41.41:8786')
+    #
     fname = '~/Dropbox/PhD/htm_models_adelaide/engine/vs_model/swarm_data/115_2_1_2_3_4_swarm.pkl.gz'
     args = []
-    print(do_model((fname, 20, 3, SCHEME_MEAN)))
-    for scheme in scheme_names:
-        for b in range(10, 200, 5):
-            for order in [1, 2, 3, 4, 5, 6, 7]:
-                args.append((fname, b, order, scheme))
+    bins = 200
+    order = 3
+    fallback = SCHEME_MEAN
+    res = (do_model((fname, bins, order, fallback)))
+    df = res[-1]
+    ax = df.drop(columns=['binned_flow']).plot(title=f'Markov Model (order {order}, {bins} bins, {fallback} fallback) Predictions on VS Data')
+    ax.set_xlabel('Datetime')
+    ax.set_ylabel('Flow')
+    plt.show()
+    # for scheme in scheme_names:
+    #     for b in range(10, 200, 5):
+    #         for order in [1, 2, 3, 4, 5, 6, 7]:
+    #             args.append((fname, b, order, scheme))
 
-    futures = client.map(do_model, args, retries=5)
-
-    results = client.gather(futures)
-    results.sort(key=lambda x: x[-1])
-    print(tabulate(results, headers=['Bins', 'Order', 'Time', 'Rows', 'Missing', 'Missing %', 'Scheme', 'RMSE']))
+    # futures = client.map(do_model, args, retries=5)
+    #
+    # results = client.gather(futures)
+    # results.sort(key=lambda x: x[-1])
+    # print(tabulate(results, headers=['Bins', 'Order', 'Time', 'Rows', 'Missing', 'Missing %', 'Scheme', 'RMSE']))

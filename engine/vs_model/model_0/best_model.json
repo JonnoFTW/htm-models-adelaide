@@ -1,0 +1,105 @@
+{
+  "aggregationInfo": {
+    "seconds": 0,
+    "fields": [],
+    "months": 0,
+    "days": 0,
+    "years": 0,
+    "hours": 0,
+    "microseconds": 0,
+    "weeks": 0,
+    "minutes": 0,
+    "milliseconds": 0
+  },
+  "model": "HTMPrediction",
+  "version": 1,
+  "predictAheadTime": null,
+  "modelParams": {
+    "sensorParams": {
+      "verbosity": 0,
+      "encoders": {
+        "datetime_timeOfDay": {
+          "type": "DateEncoder",
+          "timeOfDay": [
+            61,
+            7.98258150972241
+          ],
+          "fieldname": "datetime",
+          "name": "datetime_timeOfDay"
+        },
+        "flow": {
+          "type": "RandomDistributedScalarEncoder",
+          "resolution": 16.23076923076923,
+          "fieldname": "flow",
+          "name": "flow"
+        },
+        "datetime_weekend": {
+          "weekend": 3,
+          "fieldname": "datetime",
+          "name": "datetime_weekend",
+          "type": "DateEncoder"
+        },
+        "datetime_dayOfWeek": {
+          "dayOfWeek": [
+            45,
+            9.772369986795262
+          ],
+          "type": "DateEncoder",
+          "fieldname": "datetime",
+          "name": "datetime_dayOfWeek"
+        }
+      },
+      "sensorAutoReset": null
+    },
+    "anomalyParams": {
+      "anomalyCacheRecords": null,
+      "autoDetectThreshold": null,
+      "autoDetectWaitRecords": null
+    },
+    "spParams": {
+      "columnCount": 2048,
+      "spVerbosity": 0,
+      "spatialImp": "cpp",
+      "inputWidth": 0,
+      "synPermInactiveDec": 0.018737661810966033,
+      "synPermConnected": 0.1695365208222095,
+      "synPermActiveInc": 0.026714652302884813,
+      "seed": 1956,
+      "numActiveColumnsPerInhArea": 58,
+      "boostStrength": 0.00285594807484314,
+      "globalInhibition": 1,
+      "potentialPct": 0.647293593622838
+    },
+    "trainSPNetOnlyIfRequested": false,
+    "clParams": {
+      "alpha": 0.18000595567873498,
+      "verbosity": 0,
+      "steps": "1",
+      "regionName": "SDRClassifierRegion"
+    },
+    "tmParams": {
+      "columnCount": 2048,
+      "activationThreshold": 8,
+      "pamLength": 8,
+      "cellsPerColumn": 22,
+      "permanenceInc": 0.09402868237808115,
+      "minThreshold": 17,
+      "verbosity": 0,
+      "maxSynapsesPerSegment": 64,
+      "outputType": "normal",
+      "globalDecay": 0.0,
+      "initialPerm": 0.2601756019527286,
+      "permanenceDec": 0.03419720491174427,
+      "seed": 1960,
+      "maxAge": 0,
+      "newSynapseCount": 38,
+      "maxSegmentsPerCell": 52,
+      "temporalImp": "cpp",
+      "inputWidth": 2048
+    },
+    "tmEnable": true,
+    "clEnable": true,
+    "spEnable": true,
+    "inferenceType": "TemporalMultiStep"
+  }
+}

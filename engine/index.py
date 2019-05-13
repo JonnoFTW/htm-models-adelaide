@@ -108,7 +108,7 @@ def get_time_encoders():
         'fieldname': 'timestamp',
         'name': 'timestamp_dayOfWeek',
         'type': 'DateEncoder',
-        'timeOfDay': (51, 9.49)
+        'dayOfWeek': (51, 9.49)
     }
   #  , {
   #      'fieldname': 'weekOfYear',
@@ -147,7 +147,7 @@ def createModel(intersection):
         except:
             return None
         print "Using", pField, "as predictedField for", intersection
-        location = locations_collection.find_one({'intersection_number': intersection})
+        location = locations_collection.find_one({'site_no': intersection})
 
         for k in location['sensors']:
             modelParams['modelParams']['sensorParams']['encoders'][k] = get_sensor_encoder(k)
@@ -179,9 +179,9 @@ def setup_location_sensors(intersection):
     if not intersection:
         query = {}
     else:
-        query = {'intersection_number': {'$in': intersection.split(',')}}
+        query = {'site_no': {'$in': intersection.split(',')}}
     for i in locations_collection.find(query):
-        counts = get_most_used_sensors(i['intersection_number']).most_common()
+        counts = get_most_used_sensors(i['site_no']).most_common()
         if len(counts) == 0:
             continue
         locations_collection.update_one({'_id': i['_id']},
@@ -225,7 +225,7 @@ class Worker(multiprocessing.Process):
         self.intersection = intersection
 
     def run(self):
-        locations_collection.find_one_and_update({'intersection_number': self.intersection}, {'$set':{'running':True}})
+        locations_collection.find_one_and_update({'site_no': self.intersection}, {'$set':{'running':True}})
         anomaly_likelihood_helper = anomaly_likelihood.AnomalyLikelihood(200, 200, reestimationPeriod=10)
         model = create_single_sensor_model(self.sensor, self.intersection)
         while not self.done:
@@ -257,7 +257,7 @@ def process_readings(readings, intersection, write_anomaly, progress=True, multi
 
     if multi_model:
 
-        loc = locations_collection.find_one({'intersection_number': intersection})
+        loc = locations_collection.find_one({'site_no': intersection})
         models = {}
         for sensor in loc['sensors']:
             models[sensor] = Worker(sensor, intersection)
@@ -315,7 +315,7 @@ def process_readings(readings, intersection, write_anomaly, progress=True, multi
             write_anomaly_out(i, anomalies, predictions)
         if _smoothing:
             previous.append(i['readings'])
-    locations_collection.find_one_and_update({'intersection_number': intersection}, {'$unset': {'running': ''}})
+    locations_collection.find_one_and_update({'site_no': intersection}, {'$unset': {'running': ''}})
     if multi_model:
         for proc in models.values():
             proc.terminate()
@@ -383,7 +383,7 @@ def run_all_intersections(write_anomaly, incomplete, intersections, multi_model,
         locations = list(readings_collection.aggregate(query))
 
     else:
-        key = 'intersection_number'
+        key = 'site_no'
         if intersections != '':
             query = {key: {'$in': intersections.split(',')}}
         else:
@@ -435,7 +435,7 @@ def create_downstream_model(intersections):
     :return:
     """
     model_params = getModelParamsFromName('3104_3044', clear=True)
-    intersection = locations_collection.find_one({'intersection_number': intersections[0],
+    intersection = locations_collection.find_one({'site_no': intersections[0],
                                                   'neighbours_sensors': {'$exists': True}})
     if intersection is None:
         sys.exit('No such intersection exists or it has no neighbours_sensors')
@@ -557,14 +557,14 @@ def process_upstream_model(model, sensors):
 
 def run_upstream_model(intersections, args):
 
-    downstream = locations_collection.find_one({'intersection_number': intersections[0]})
+    downstream = locations_collection.find_one({'site_no': intersections[0]})
     if args.aggregate:
         model = create_upstream_model()
     else:
         model = 5
     sensors = {
         'downstream': {
-            'id': downstream['intersection_number'],
+            'id': downstream['site_no'],
             'sensors': map(lambda x: str(x*8), downstream['neighbours_sensors'][intersections[1]]['to'])
         },
         'upstream': {

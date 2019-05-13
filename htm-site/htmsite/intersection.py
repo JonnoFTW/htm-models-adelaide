@@ -1,7 +1,10 @@
 import json
 from datetime import timedelta, datetime
-
+from collections import defaultdict
 import pymongo
+from pyramid.httpexceptions import HTTPNotFound
+from pyramid.request import Request
+
 from .util import du, get_accident_near, date_format
 from .reports import REPORTS
 from pluck import pluck
@@ -96,8 +99,8 @@ def show_intersection(request):
     #     last = cursor[-1]['datetime']
     if request.GET.get('start') and request.GET.get('end'):
         try:
-            from_date = datetime.utcfromtimestamp(int(request.GET['start']) )
-            end_date = datetime.utcfromtimestamp(int(request.GET['end']) )
+            from_date = datetime.utcfromtimestamp(int(request.GET['start']))
+            end_date = datetime.utcfromtimestamp(int(request.GET['end']))
             last_reading = next(request.db.scats_readings.find({'site_no': site, 'datetime': {'$gte': end_date}}))
             print(from_date, end_date)
         except Exception as e:
@@ -157,6 +160,74 @@ def get_readings_anomaly_json(request):
     return get_anomaly_scores(ft, tt, args['intersection'], request=request)
 
 
+@view_config(route_name='readings_vs_sm_anomalies', renderer='bson', request_method='GET')
+def get_readings_vs_sm_anomalies(request: Request):
+    out = defaultdict(dict)
+    ft = du(request.GET['from'])
+    tt = du(request.GET['to'])
+    si = request.GET['si']
+    site = request.GET['site']
+    ft, tt = sorted([ft, tt])
+    # get the site
+    print(ft, tt)
+    location = request.db.locations.find_one({'site_no': site})
+    if not location:
+        raise HTTPNotFound("No such site")
+    sensors = None
+    for i in location['strategic_inputs']:
+        if ft > datetime.strptime(i['date'], "%Y%m%d"):
+            sensors = i['si'][si]['sensors']
+            break
+    if sensors is None:
+        raise HTTPNotFound("No such strategic input for this period")
+    drange = {
+        '$gte': ft,
+        '$lte': tt,
+    }
+    # vs readings
+    for i in request.db.scats_readings.find({
+        'datetime': drange,
+        'site_no': site
+    }):
+        out[i['datetime']]['vs'] = sum([i['readings'][str(x)] for x in sensors if i['readings'][str(x)] < 200])
+    #sm readings
+    for i in request.db.scats_sm.find({
+        'site_no': site,
+        'strategic_input': int(si),
+        'datetime': drange
+    }):
+        date_key = i['datetime']
+        if date_key in out and 'sm' in out[date_key]:
+            date_key += timedelta(seconds=30)
+        out[date_key]['sm'] = i['measured_flow']
+    # anomalies
+    for i in request.db.scats_anomalies.find({
+        'datetime': drange,
+        'site_no': site
+    }):
+        out[i['datetime']][i['algorithm'] + '_' + i['ds']] = True
+    # anomalies
+    for c in request.db.crashes.find({
+        'loc': {
+            '$geoNear': {
+                '$geometry': location['loc'],
+                '$maxDistance': 150
+            }
+        },
+        'datetime': drange
+    }):
+        out[c['datetime']]['crash'] = str(c['_id'])
+    lim = 3
+    fields = ['datetime', 'vs', 'sm', 'crash', 'HTM_vs', 'shesd_vs', 'HTM_sm', 'shesd_sm']
+    array_out = [fields[:3]]
+    for dt in sorted(out):
+        row = [dt.isoformat()]
+        for f in fields[1:lim]:
+            row.append(out[dt].get(f))
+        array_out.append(row)
+    return array_out
+
+
 @view_config(route_name='get_anomalies_json', renderer='pymongo_cursor')
 def get_anomalies(request):
     args = request.matchdict
@@ -182,6 +253,7 @@ def get_anomalies(request):
         query['datetime']['$gte'] = from_date
     if tt is not None:
         query['datetime']['$lte'] = to_date
+    query['algorithm'] = {'$in':['HTM','shesd']}
     return request.db.scats_anomalies.find(query)
 
 
