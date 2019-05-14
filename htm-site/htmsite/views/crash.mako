@@ -246,6 +246,10 @@
 
 
         $.each(locations, function (i, v) {
+            if (v.loc.coordinates === undefined) {
+                console.log(v);
+                return;
+            }
             map.addMarker({
                 lat: v.loc.coordinates[1],
                 lng: v.loc.coordinates[0],
