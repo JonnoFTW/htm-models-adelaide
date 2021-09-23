@@ -1,6 +1,6 @@
 from pyramid.authentication import AuthTktAuthenticationPolicy
 from pyramid.authorization import ACLAuthorizationPolicy
-from pyramid.security import unauthenticated_userid
+from pyramid.request import Request
 import logging
 
 log = logging.getLogger(__name__)
@@ -46,8 +46,8 @@ def main(global_config, **settings):
 
     config.add_request_method(add_db, 'db', reify=True)
 
-    def get_user(request):
-        userid = unauthenticated_userid(request)
+    def get_user(request: Request):
+        userid = request.unauthenticated_userid
         if userid is not None:
             return request.db['scats_users'].find_one({'username': request.authenticated_userid})
 
