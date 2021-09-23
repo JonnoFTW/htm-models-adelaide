@@ -83,6 +83,7 @@ def main(global_config, **settings):
     config.add_route('update_neighbour_list', '/intersection/{site_no}/update_neighbours_list')
     config.add_route('update_neighbours', '/intersection/{site_no}/update_neighbours')
     config.add_route('csv_export', '/export')
+    config.add_route('users', '/users')
     config.add_route('login', '/login')
     config.add_route('logout', '/logout')
 

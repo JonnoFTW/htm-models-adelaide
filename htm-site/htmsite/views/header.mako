@@ -82,6 +82,7 @@
                 <li><a href="/incidents">Incidents</a></li>
                 <li><a href="/crashes">Crashes</a></li>
                 <li><a href="/export">Export</a></li>
+                <li><a href="/users">Users</a></li>
               </ul>
                 <ul class="nav navbar-nav navbar-right">
                 %if request.authenticated_userid:
