@@ -17,8 +17,10 @@ requires = [
     'ldap3',
     'numpy',
     'bcrypt',
-    'numba',
-    'matplotlib'
+    # 'numba',
+    'matplotlib',
+    'pluck',
+    'pymongo'
     ]
 
 setup(name='htm-site',
