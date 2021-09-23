@@ -7,6 +7,8 @@ log = logging.getLogger(__name__)
 
 
 date_format = '%H/%M/%D'
+
+
 def get_accident_near(time_start, time_end, intersection, radius=150, request=None):
     """
     Return any accidents at this time,

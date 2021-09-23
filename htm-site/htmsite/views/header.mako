@@ -3,7 +3,7 @@
     <head>
         <link rel="icon" href="/assets/favicon.ico" type="image/x-icon"/>
         <link rel="shortcut icon" href="/assets/favicon.ico" type="image/x-icon"/>
-        <meta http-equiv="content-type" content="text/html; charset=UTF-8"> 
+        <meta http-equiv="content-type" content="text/html; charset=UTF-8">
         <meta charset="utf-8">
         <title>HTM Adelaide</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
