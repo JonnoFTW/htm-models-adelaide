@@ -22,12 +22,12 @@ def add_user(request):
     login_type = request.POST.get('login_type')
 
     if login_type not in LOGIN_TYPES:
-        return HTTPBadRequest('Login type must be in ' + ', '.join(LOGIN_TYPES))
+        return AJAXHttpBadRequest('Login type must be in ' + ', '.join(LOGIN_TYPES))
     if login_type == 'ldap':
-        if not re.findall(r"\[a-z]{1,4}\d{4}", new_fan):
-            return HTTPBadRequest("Must be a valid FAN")
-    if request.db.webcan_users.find_one({'username': new_fan}) is not None:
-        return HTTPBadRequest('Empty or existing usernames cannot be used again')
+        if not re.findall(r"[a-z]{1,4}\d{4}", new_fan):
+            return AJAXHttpBadRequest("Must be a valid FAN")
+    if request.db['scats_users'].find_one({'username': new_fan}) is not None:
+        return AJAXHttpBadRequest('Empty or existing usernames cannot be used again')
 
     new_user_obj = {
         'username': new_fan,
@@ -41,5 +41,19 @@ def add_user(request):
         new_user_obj['password'] = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         new_user_obj['reset_password'] = secrets.token_urlsafe(16)
 
-    request.db.webcan_users.insert_one(new_user_obj)
+    request.db['scats_users'].insert_one(new_user_obj)
     return new_user_obj
+
+
+class AJAXHttpBadRequest(HTTPBadRequest):
+    def doJson(self, status, body, title, environ):
+        return {
+            'message': self.detail,
+            'code': status,
+            'title': self.title
+        }
+
+    def __init__(self, detail):
+        HTTPBadRequest.__init__(self, detail, json_formatter=self.doJson)
+
+        self.content_type = 'application/json'
