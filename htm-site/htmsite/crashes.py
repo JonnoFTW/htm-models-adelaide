@@ -1,8 +1,7 @@
 import json
 from datetime import timedelta, datetime
 
-import pymongo
-from geopy.distance import vincenty
+from geopy.distance import geodesic
 from .util import du, get_accident_near
 from .intersection import _get_intersections
 from pluck import pluck
@@ -120,6 +119,6 @@ def show_incidents(request):
             'site_no': site['site_no']
         }).limit(3).sort('datetime')
         incidents.append(
-            (crash, list(readings), site, vincenty(site['loc']['coordinates'], crash['loc']['coordinates']).meters))
+            (crash, list(readings), site, geodesic(site['loc']['coordinates'], crash['loc']['coordinates']).meters))
     #  print json.dumps(incidents, indent=4, default=json_util.default)
     return {'incidents': incidents}
