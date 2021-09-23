@@ -6,5 +6,6 @@ geopy
 ldap3
 numpy
 bcrypt
-numba
 matplotlib
+pluck
+pymongo

@@ -2,11 +2,10 @@ from calendar import monthrange
 from collections import Counter
 from datetime import date, timedelta, datetime
 import numpy as np
-from numba import jit
+# from numba import jit
 import logging
 
 log = logging.getLogger(__name__)
-from pluck import ipluck, pluck
 from pymongo.command_cursor import CommandCursor
 from pyramid.view import view_config
 
@@ -17,7 +16,7 @@ REPORTS = ('Daily Total', 'Monthly Average', 'AM Peak', 'PM Peak',
 fmt = '%d/%m/%Y'
 
 
-@jit()
+# @jit()
 def _get_daily_volume(data, hour=None):
     """
 
@@ -36,7 +35,7 @@ def _get_daily_volume(data, hour=None):
     return counter
 
 
-@jit()
+# @jit()
 def _monthly_average(data):
     monthly_average = Counter()
     for i, j in _get_daily_volume(data).items():
